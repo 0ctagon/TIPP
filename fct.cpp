@@ -30,10 +30,10 @@ TLorentzVector TransfoLorentz(TVector3 b, RooRealVar costheta, RooRealVar phi, d
 
 struct Particle{
    	double_t E;
+    double_t P;
     double_t Px;
     double_t Py;
     double_t Pz;
-    double_t P;
     double_t Costheta;
     double_t Phi;
 };
