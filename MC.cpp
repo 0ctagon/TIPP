@@ -2,6 +2,12 @@
 #include <TRandom3.h>
 #include "fct.cpp"
 
+RooAbsPdf * m12distrib(RooRealVar& m12)
+{
+    RooGenericPdf * m12fct = new RooGenericPdf("m12_fct","m12*sqrt((pow(5.27931,2)-pow(m12+0.493677,2))*(pow(5.27931,2)-pow(m12-0.493677,2)))",m12);
+    return m12fct;
+}
+
 void MC()
 {
     //Set seed
@@ -18,6 +24,7 @@ void MC()
     Particle Nu1;
     Particle Nu2;
     Particle NuNu;
+    Dalitz dalitz;
 
     int nbevts = 100000;
 
@@ -30,6 +37,7 @@ void MC()
     tree->Branch("Nu1event", &Nu1, "E/D:P/D:Px/D:Py/D:Pz/D:Costheta/D:Phi/D");
     tree->Branch("Nu2event", &Nu2, "E/D:P/D:Px/D:Py/D:Pz/D:Costheta/D:Phi/D");
     tree->Branch("NuNuevent", &NuNu, "E/D:P/D:Px/D:Py/D:Pz/D:Costheta/D:Phi/D");
+    tree->Branch("Dalitz", &dalitz, "m12_2/D:m23_2/D");
 
     //All the constant in our simulation
     RooRealVar Ep("Ep","Positron energy (GeV)",4.0);
@@ -59,10 +67,15 @@ void MC()
     RooRealVar costheta2("costheta2","angle between 2nu in the COM of B",0,-1,1);
     RooRealVar phi2("phi2","angle between 2nu in the COM of B",0,0,TMath::TwoPi());
 
-    RooRealVar m12("m12","mass 2nu system",0,0,(mb.getVal()-mk.getVal()));
+    RooRealVar m12("m12","mass 2nu system",0,0,4.7856330);
 
     //Calculate the boost for the B mesons
     TVector3 betaU = Boost(Qu);
+
+    //m12 distribution
+    RooAbsPdf* m12distribution = m12distrib(m12);
+    RooAbsReal * m12Cdf = m12distribution->createCdf(m12);
+    TF1 * m12CdfTH1 = m12Cdf->asTF(m12);
 
     for(int i=0;i<nbevts;i++)
     {
@@ -76,7 +89,7 @@ void MC()
         costheta2.setVal(random->Uniform(costheta2.getMin(),costheta2.getMax()));
         phi2.setVal(random->Uniform(phi2.getMin(),phi2.getMax()));
         
-        m12.setVal(random->Uniform(m12.getMin(),m12.getMax()));
+        double_t u = random->Uniform(0,1);
         
         //Calculate the 4-vector for B & B_
         TLorentzVector Qb1 = TransfoLorentz(betaU,costheta,phi,pb,q/2);
@@ -85,11 +98,13 @@ void MC()
         //Calculate the 4-vector for K & 2nu
         TVector3 betaB1 = Boost(Qb1);
 
+        m12.setVal(m12CdfTH1->GetX(u));
+
         double_t pK = sqrt((pow(mb.getVal(),2)-pow(m12.getVal()+mk.getVal(),2))*(pow(mb.getVal(),2)-pow(m12.getVal()-mk.getVal(),2)))/(2*mb.getVal());
         double_t EK = sqrt(mk.getVal()*mk.getVal()+pK*pK);
         
         double_t pnunu = -pK;
-        double_t Enunu = (q/2)-EK;
+        double_t Enunu = mb.getVal()-EK;
 
         TLorentzVector Qk = TransfoLorentz(betaB1, costheta1, phi1, pK, EK);
         TLorentzVector Qnunu = TransfoLorentz(betaB1, costheta1, phi1, pnunu, Enunu);
@@ -101,6 +116,11 @@ void MC()
 
         TLorentzVector Qnu1 = TransfoLorentz(betanunu, costheta2, phi2, qnunu/2, qnunu/2);
         TLorentzVector Qnu2 = TransfoLorentz(betanunu, costheta2, phi2, -qnunu/2, qnunu/2);
+
+        //std::cout<<"Px : "<<Qb1.Px()/(Qnu1.Px()+Qnu2.Px()+Qk.Px())<<" "<<Qb1.Px()/(Qnunu.Px()+Qk.Px())<<std::endl;//<<" "<<Qnu1.Px()+Qnu2.Px()+Qk.Px()<<" "<<Qk.Px()+Qnunu.Px()<<std::endl;
+        //std::cout<<"Py : "<<Qb1.Py()/(Qnu1.Py()+Qnu2.Py()+Qk.Py())<<" "<<Qb1.Py()/(Qnunu.Py()+Qk.Py())<<std::endl;
+        //std::cout<<"Pz : "<<Qb1.Pz()/(Qnu1.Pz()+Qnu2.Pz()+Qk.Pz())<<" "<<Qb1.Pz()/(Qnunu.Pz()+Qk.Pz())<<std::endl;
+        //std::cout<<"E  : "<<Qb1.E()/(Qnu1.E()+Qnu2.E()+Qk.E())<<" "<<Qb1.E()/(Qnunu.E()+Qk.E())<<std::endl;
 
         //Building the tree
         B1.E=Qb1.E();   file >> B1.E;
@@ -151,10 +171,18 @@ void MC()
         NuNu.Costheta=-costheta1.getVal();file >> NuNu.Costheta;
         NuNu.Phi=(TMath::Pi()-phi1.getVal());file >> NuNu.Phi;
 
+        dalitz.m12=pow(m12.getVal(),2);file >> dalitz.m12;
+        dalitz.m23=(Qk+Qnu2)*(Qk+Qnu2);file >> dalitz.m23;
+
         tree->Fill();
         
     }
     file.close();
     tree->Write();
+
+    //Draw the Dalitz plot
+    tree->Draw("m23_2:m12_2>>(250,0,25,300,0,30)","","colz");
+
     ftree->Close();
+
 }

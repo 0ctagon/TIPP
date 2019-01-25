@@ -37,3 +37,8 @@ struct Particle{
     double_t Phi;
 };
 
+struct Dalitz{
+    double_t m12;
+    double_t m23;
+};
+

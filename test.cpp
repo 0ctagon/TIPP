@@ -1,36 +1,56 @@
 
 #include "TLorentzVector.h"
+RooAbsPdf * fct(RooRealVar& x)
+{
+	RooGenericPdf * testt = new RooGenericPdf("fvgu","x*sqrt((pow(5.27931,2)-pow(x+0.493677,2))*(pow(5.27931,2)-pow(x-0.493677,2)))",x);
+   //RooRealVar * csbkgmean = new RooRealVar("csbkgmean","CS bkg mean",0) ;
+	//RooRealVar * csbkgsigma = new RooRealVar("csbkgsigma","CS bkg sigma ",1) ;
+   //RooGaussian * testt = new RooGaussian("testt","gaussian PDF",x,*csbkgmean,*csbkgsigma) ;
+   return testt;
+}
+
+
 
 void test() {
-// example of use of TGenPhaseSpace
-//Author: Valerio Filippini
+   RooRealVar x("x","x",0,0,4.7856330);
+   RooAbsPdf * f = fct(x);
+   RooAbsReal * g = f->createCdf(x);
 
-   if (!gROOT->GetClass("TGenPhaseSpace")) gSystem->Load("libPhysics");
+   //m12.setVal(m12distribution(m12)->createCdf(m12)->asTF(m12)->GetX(m12));
 
-   TLorentzVector b0(0.0, 0.0, 0.65, 1.538);
+   //std::cout<<g->getVal(0.5)<<std::endl;
 
-   RooRealVar phi2("phi2","angle between 2nu in the COM of B",50,0,5884);
-   std::cout<<phi2.getMax()<<" "<<phi2.getMin()<<std::endl;
-   //(Momentum, Energy units are Gev/C, GeV)
-   Double_t masses[3] = { 0.938, 0., 0.} ;
+   RooPlot* frame = x.frame() ;
+	//frame->SetNdivisions(505,"X");
+	RooPlot* frame2 = x.frame() ;
+   
+	f->plotOn(frame) ;
+   g->plotOn(frame2) ;
 
-   TGenPhaseSpace event;
-   event.SetDecay(b0, 3, masses);
+   TF1 * gcumuhisto = g->asTF(x);
 
-   TH2F *h2 = new TH2F("h2","h2", 50,1.1,1.8, 50,1.1,1.8);
+   int N=10000;
+   double_t X[N],Y[N];
+   double h=1.0/N;
+   int j=0;
 
-   for (Int_t n=0;n<100000;n++) {
-      Double_t weight = event.Generate();
-
-      TLorentzVector *pProton = event.GetDecay(0);
-
-      TLorentzVector *pPip    = event.GetDecay(1);
-      TLorentzVector *pPim    = event.GetDecay(2);
-
-      TLorentzVector pPPip = *pProton + *pPip;
-      TLorentzVector pPPim = *pProton + *pPim;
-
-      h2->Fill(pPPip.M2() ,pPPim.M2() ,weight);
+   for(double i=0;i<1;i+=h)
+   {
+      X[j]=gcumuhisto->GetX(i);
+      //std::cout<<X[j]<<" "<<Y[j]<<" "<<h<<endl;
+      Y[j]=i;
+      j+=1;
    }
-   h2->Draw();
+   TGraph *gr1 = new TGraph (N,Y,X);
+
+   TCanvas* c2 = new TCanvas("bphysicsbkg","bphysics bkg",900,900) ;
+	c2->Divide(2,2);
+	c2->cd(1);
+	gPad->SetLeftMargin(0.15) ; frame->GetYaxis()->SetTitleOffset(1.6) ; frame->Draw() ;
+	c2->cd(2);
+	gPad->SetLeftMargin(0.15) ; frame2->GetYaxis()->SetTitleOffset(1.6) ; frame2->Draw() ;
+	c2->cd(3);
+	gPad->SetLeftMargin(0.15) ; gr1->Draw() ;
+   c2->cd(4);
+	gPad->SetLeftMargin(0.15) ; //gcumuhisto->Draw() ;
 }
