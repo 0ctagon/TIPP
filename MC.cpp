@@ -4,7 +4,7 @@
 
 RooAbsPdf * m12distrib(RooRealVar& m12)
 {
-    RooGenericPdf * m12fct = new RooGenericPdf("m12_fct","m12*sqrt((pow(5.27931,2)-pow(m12+0.493677,2))*(pow(5.27931,2)-pow(m12-0.493677,2)))",m12);
+    RooGenericPdf * m12fct = new RooGenericPdf("m12_fct","m12*sqrt((pow(5.27931,2)-pow(m12+0.89166,2))*(pow(5.27931,2)-pow(m12-0.89166,2)))",m12);
     return m12fct;
 }
 
@@ -26,7 +26,7 @@ void MC()
     Particle NuNu;
     Dalitz dalitz;
 
-    int nbevts = 100000;
+    int nbevts = 10000;
 
     //Define the tree, each branch is a particle
     TFile *ftree = new TFile("MC.root","recreate");
@@ -44,9 +44,9 @@ void MC()
     RooRealVar Ee("Ee","Electron energy (GeV)",7.0);
     RooRealVar angle("angle","Angle between e+e- beam (rad)",0.083);
     RooRealVar mb("mb","mass b+/b-",5.27931);
-    RooRealVar mk("mk","mass k+",0.493677);
+    RooRealVar mk("mk","mass k*+/-",0.89166);
     //RooRealVar mb("mb","mass b0",5.27962);
-    //RooRealVar mk("mk","mass k0",0.497611);
+    //RooRealVar mk("mk","mass k*0",0.89581);
 
     //Define the 4-vectors for e-/e+ & Upsilon 4S
     TLorentzVector Qp(-Ep.getVal(),0,0,Ep.getVal());
@@ -67,7 +67,7 @@ void MC()
     RooRealVar costheta2("costheta2","angle between 2nu in the COM of B",0,-1,1);
     RooRealVar phi2("phi2","angle between 2nu in the COM of B",0,0,TMath::TwoPi());
 
-    RooRealVar m12("m12","mass 2nu system",0,0,4.7856330);
+    RooRealVar m12("m12","mass 2nu system",0,0,4.38765);
 
     //Calculate the boost for the B mesons
     TVector3 betaU = Boost(Qu);
@@ -177,12 +177,82 @@ void MC()
         tree->Fill();
         
     }
-    file.close();
-    tree->Write();
+
+    //Draw efficacity histogram
+    int Nbin=100;
+    double_t xmin=0.0,xmax=5.1;
+    TH1D *missE = new TH1D("missE","Missing energy",Nbin,xmin,xmax);
+    tree->Draw("NuNuevent.E>>missE","","goff");
+    
+    TH1D *TH1efficiency = new TH1D("TH1efficiency","Efficiency",100,xmin,xmax);
+
+    double_t full_integral = missE->Integral(), cut_integral;
+    double h = xmax/Nbin; double x=0;
+    double_t Vefficiency[Nbin],Vpurity[Nbin];
+
+    for(int i=0;i<Nbin;i+=1)
+    {
+        cut_integral = missE->Integral(i,Nbin)/full_integral;
+        TH1efficiency->SetBinContent(i,cut_integral);
+        x+=h;
+        Vefficiency[i]=cut_integral;
+    }
+
+    //Create fake bkg
+    TH1D *fakebkg = new TH1D("fakebkg","fakebkg",Nbin,xmin,xmax);
+    fakebkg->FillRandom("gaus",nbevts);
+
+    TH1D *sumbkgsig = new TH1D("sumbkgsig","sumbkgsig",Nbin,xmin,xmax);
+    sumbkgsig->Add(fakebkg,missE);
+	
+    //Draw purity histogram
+    TH1D *TH1purity = new TH1D("TH1purity","purity",100,xmin,xmax);
+    x=0; double_t sum_integral;
+
+    for(int i=0;i<Nbin;i+=1)
+    {
+        sum_integral = sumbkgsig->Integral(i,Nbin);
+        cut_integral = missE->Integral(i,Nbin)/sum_integral;
+        if(sum_integral<0.01)
+        {
+            TH1purity->SetBinContent(i, 0.0);
+            Vpurity[i]=0;
+        }
+        else
+        {
+            TH1purity->SetBinContent(i,cut_integral);
+            Vpurity[i]=cut_integral;
+        }
+        x+=h;
+        
+    }
+
+    TGraph *GraphPurEff = new TGraph (Nbin,Vefficiency,Vpurity);
+
+    TCanvas* c2 = new TCanvas("bphysicsbkg","bphysics bkg",900,900) ;
+	c2->Divide(2,2);
+	c2->cd(1);
+	gPad->SetLeftMargin(0.15) ;  GraphPurEff->Draw() ;
+	
+
+    TH1D *TH1PurEff = new TH1D("TH1PurEff","Purity(efficiency)",100,0,1);
+    double_t y;
+   
+    for(int i=0;i<Nbin;i+=1)
+    {
+        GraphPurEff->GetPoint(i, x, y);
+        TH1PurEff->SetBinContent(i,y);
+    }
+    
+	
+
+    tree->Fill();
+    
+    ftree->Write();
 
     //Draw the Dalitz plot
-    tree->Draw("m23_2:m12_2>>(250,0,25,300,0,30)","","colz");
+    //tree->Draw("m23_2:m12_2>>(250,0,25,300,0,30)","","colz");
 
     ftree->Close();
-
+    file.close();
 }
