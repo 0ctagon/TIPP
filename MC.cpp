@@ -117,11 +117,6 @@ void MC()
         TLorentzVector Qnu1 = TransfoLorentz(betanunu, costheta2, phi2, qnunu/2, qnunu/2);
         TLorentzVector Qnu2 = TransfoLorentz(betanunu, costheta2, phi2, -qnunu/2, qnunu/2);
 
-        //std::cout<<"Px : "<<Qb1.Px()/(Qnu1.Px()+Qnu2.Px()+Qk.Px())<<" "<<Qb1.Px()/(Qnunu.Px()+Qk.Px())<<std::endl;//<<" "<<Qnu1.Px()+Qnu2.Px()+Qk.Px()<<" "<<Qk.Px()+Qnunu.Px()<<std::endl;
-        //std::cout<<"Py : "<<Qb1.Py()/(Qnu1.Py()+Qnu2.Py()+Qk.Py())<<" "<<Qb1.Py()/(Qnunu.Py()+Qk.Py())<<std::endl;
-        //std::cout<<"Pz : "<<Qb1.Pz()/(Qnu1.Pz()+Qnu2.Pz()+Qk.Pz())<<" "<<Qb1.Pz()/(Qnunu.Pz()+Qk.Pz())<<std::endl;
-        //std::cout<<"E  : "<<Qb1.E()/(Qnu1.E()+Qnu2.E()+Qk.E())<<" "<<Qb1.E()/(Qnunu.E()+Qk.E())<<std::endl;
-
         //Building the tree
         B1.E=Qb1.E();   file >> B1.E;
         B1.P=Qb1.P();   file >> B1.P;
@@ -180,7 +175,7 @@ void MC()
 
     //Draw efficacity histogram
     int Nbin=100;
-    double_t xmin=0.0,xmax=5.1;
+    double_t xmin=0.0,xmax=4.69;
     TH1D *missE = new TH1D("missE","Missing energy",Nbin,xmin,xmax);
     tree->Draw("NuNuevent.E>>missE","","goff");
     
@@ -199,8 +194,9 @@ void MC()
     }
 
     //Create fake bkg
+    TF1 *rdmfct = new TF1("rdmfct","TMath::Exp(x)",xmin,xmax);
     TH1D *fakebkg = new TH1D("fakebkg","fakebkg",Nbin,xmin,xmax);
-    fakebkg->FillRandom("gaus",nbevts);
+    fakebkg->FillRandom("rdmfct",nbevts);
 
     TH1D *sumbkgsig = new TH1D("sumbkgsig","sumbkgsig",Nbin,xmin,xmax);
     sumbkgsig->Add(fakebkg,missE);
@@ -235,19 +231,18 @@ void MC()
 	gPad->SetLeftMargin(0.15) ;  GraphPurEff->Draw() ;
 	
 
-    TH1D *TH1PurEff = new TH1D("TH1PurEff","Purity(efficiency)",100,0,1);
-    double_t y;
+    //TH1D *TH1PurEff = new TH1D("TH1PurEff","Purity(efficiency)",100,0,1);
+    //double_t y;
    
-    for(int i=0;i<Nbin;i+=1)
-    {
-        GraphPurEff->GetPoint(i, x, y);
-        TH1PurEff->SetBinContent(i,y);
-    }
+    //for(int i=0;i<Nbin;i+=1)
+    //{
+    //    GraphPurEff->GetPoint(i, x, y);
+    //    TH1PurEff->SetBinContent(i,y);
+    //S}
     
 	
 
     tree->Fill();
-    
     ftree->Write();
 
     //Draw the Dalitz plot
