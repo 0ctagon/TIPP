@@ -1,6 +1,8 @@
 #include "TMath.h"
 #include "TVector.h"
 #include "TLorentzVector.h"
+#include <iostream>
+using namespace std;
 
 TVector3 Boost(TLorentzVector A)
 {
@@ -25,6 +27,53 @@ TLorentzVector TransfoLorentz(TVector3 b, RooRealVar costheta, RooRealVar phi, d
 
     TLorentzVector Q(p_l,p_t,p_z,E);
     return Q;
+}
+
+void GraphEff(int N)
+{
+    double_t Veff1[N],Vpur1[N],Vrej1[N];
+    double_t Veff2[N],Vpur2[N],Vrej2[N];
+    double_t Veff3[N],Vpur3[N],Vrej3[N];
+
+    ifstream Vect("vectors.txt");
+    for (int i=0;i<N;i++)
+    {
+        Vect >> Veff1[i] >> Vpur1[i] >> Vrej1[i];
+    }
+    for (int i=0;i<N;i++)
+    {
+        Vect >> Veff2[i] >> Vpur2[i] >> Vrej2[i];
+    }
+    for (int i=0;i<N;i++)
+    {
+        Vect >> Veff3[i] >> Vpur3[i] >> Vrej3[i];
+    }
+
+    TGraph *GraphPurEff1 = new TGraph (N,Veff1,Vpur1);
+    GraphPurEff1->SetTitle("Purity / Efficiency");
+    GraphPurEff1->GetHistogram()->GetXaxis()->SetTitle("Efficiency");
+    GraphPurEff1->GetHistogram()->GetYaxis()->SetTitle("Purity");
+    TGraph *GraphRejEff1 = new TGraph (N,Veff1,Vrej1);
+    GraphRejEff1->SetTitle("Rejection / Efficiency");
+    GraphRejEff1->GetHistogram()->GetXaxis()->SetTitle("Efficiency");
+    GraphRejEff1->GetHistogram()->GetYaxis()->SetTitle("Rejection");
+
+    TGraph *GraphPurEff2 = new TGraph (N,Veff2,Vpur2);
+    TGraph *GraphRejEff2 = new TGraph (N,Veff2,Vrej2);
+    TGraph *GraphPurEff3 = new TGraph (N,Veff3,Vpur3);
+    TGraph *GraphRejEff3 = new TGraph (N,Veff3,Vrej3);
+
+    TCanvas* c = new TCanvas("comparisonsigEmiss","comparison sigEmiss",900,450) ;
+	c->Divide(2,1);
+	c->cd(1);
+	GraphPurEff1->Draw("AL") ;
+    GraphPurEff2->Draw("same") ;
+    GraphPurEff3->Draw("same") ;
+    c->cd(2);
+	GraphRejEff1->Draw("AL") ;
+    GraphRejEff2->Draw("same") ;
+    GraphRejEff3->Draw("same") ;
+    Vect.close();
 }
 
 struct Particle{

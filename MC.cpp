@@ -1,6 +1,7 @@
 #include <iostream>
 #include <TRandom3.h>
 #include "fct.cpp"
+using namespace std;
 
 RooAbsPdf * m12distrib(RooRealVar& m12)
 {
@@ -47,6 +48,8 @@ void MC()
     RooRealVar mk("mk","mass k*+/-",0.89166);
     //RooRealVar mb("mb","mass b0",5.27962);
     //RooRealVar mk("mk","mass k*0",0.89581);
+
+    double_t EmissRes = 0.3;
 
     //Define the 4-vectors for e-/e+ & Upsilon 4S
     TLorentzVector Qp(-Ep.getVal(),0,0,Ep.getVal());
@@ -108,6 +111,9 @@ void MC()
 
         TLorentzVector Qk = TransfoLorentz(betaB1, costheta1, phi1, pK, EK);
         TLorentzVector Qnunu = TransfoLorentz(betaB1, costheta1, phi1, pnunu, Enunu);
+
+        double_t sigEmiss = random->Gaus(0,Qnunu.E()*EmissRes);
+        Qnunu.SetE(Qnunu.E()+sigEmiss);
 
         //Calculate the 4-vector for nu1 & nu2
         TVector3 betanunu = Boost(Qnunu);
@@ -173,37 +179,75 @@ void MC()
         
     }
 
-    //Draw efficacity histogram
+    //TrueBkg_CDM to lab frame
     int Nbin=100;
-    double_t xmin=0.0,xmax=4.69;
+    double_t xmin=0.0,xmax=6.;
+    TFile* f1 = new TFile("missingEnergy.root");
+    TTree* t1 = (TTree*)f1->Get("tree");
+
+    TH1D *Hpx_cdm = new TH1D("Hpx_cdm","Hpx_cdm",Nbin,xmin,xmax);
+    t1->Draw("px_cdm>>Hpx_cdm","","goff");
+    Hpx_cdm->Scale(betaU.X());
+    TH1D *Hpy_cdm = new TH1D("Hpy_cdm","Hpy_cdm",Nbin,xmin,xmax);
+    t1->Draw("py_cdm>>Hpy_cdm","","goff");
+    Hpy_cdm->Scale(betaU.Y());
+    TH1D *Hpz_cdm = new TH1D("Hpz_cdm","Hpz_cdm",Nbin,xmin,xmax);
+    t1->Draw("pz_cdm>>Hpz_cdm","","goff");
+    Hpz_cdm->Scale(betaU.Z());
+
+    TH1D *Enunu_cdm = new TH1D("Enunu_cdm","Enunu_cdm",Nbin,xmin,xmax);
+    t1->Draw("E_cdm>>Enunu_cdm","","goff");
+
+    double_t gammaU = 1/sqrt(1-betaU*betaU);
+
+    TH1D *Bkg = new TH1D("Bkg","Bkg",Nbin,xmin,xmax);
+    Bkg->Add(Enunu_cdm,Hpx_cdm,1,1);
+    Bkg->Add(Hpy_cdm,1);
+    Bkg->Add(Hpz_cdm,1);
+    Bkg->Scale(gammaU);
+
+    //Draw efficacity histogram
+    
     TH1D *missE = new TH1D("missE","Missing energy",Nbin,xmin,xmax);
     tree->Draw("NuNuevent.E>>missE","","goff");
     
-    TH1D *TH1efficiency = new TH1D("TH1efficiency","Efficiency",100,xmin,xmax);
+    TH1D *TH1efficiency = new TH1D("TH1efficiency","Efficiency",Nbin,xmin,xmax);
 
     double_t full_integral = missE->Integral(), cut_integral;
-    double h = xmax/Nbin; double x=0;
-    double_t Vefficiency[Nbin],Vpurity[Nbin];
+    double h = xmax/Nbin;
+    double_t Vefficiency[Nbin];
 
     for(int i=0;i<Nbin;i+=1)
     {
         cut_integral = missE->Integral(i,Nbin)/full_integral;
         TH1efficiency->SetBinContent(i,cut_integral);
-        x+=h;
         Vefficiency[i]=cut_integral;
     }
 
     //Create fake bkg
-    TF1 *rdmfct = new TF1("rdmfct","TMath::Exp(x)",xmin,xmax);
-    TH1D *fakebkg = new TH1D("fakebkg","fakebkg",Nbin,xmin,xmax);
-    fakebkg->FillRandom("rdmfct",nbevts);
+    //TH1D *fakebkg = new TH1D("fakebkg","fakebkg",Nbin,xmin,xmax);
+    //fakebkg->FillRandom("gaus",nbevts*10);
 
+    //Add bkg with signal
     TH1D *sumbkgsig = new TH1D("sumbkgsig","sumbkgsig",Nbin,xmin,xmax);
-    sumbkgsig->Add(fakebkg,missE);
+    sumbkgsig->Add(Bkg,missE);
+
+    //Draw rejection histogram
+    TH1D *TH1rejection = new TH1D("TH1rejection","rejection",Nbin,xmin,xmax);
+    double_t Vrejection[Nbin];
+    full_integral = Bkg->Integral();
+
+    for(int i=0;i<Nbin;i+=1)
+    {
+        cut_integral = Bkg->Integral(i,Nbin)/full_integral;
+        TH1rejection->SetBinContent(i,1-cut_integral);
+        Vrejection[i]=1-cut_integral;
+    }
 	
     //Draw purity histogram
-    TH1D *TH1purity = new TH1D("TH1purity","purity",100,xmin,xmax);
-    x=0; double_t sum_integral;
+    TH1D *TH1purity = new TH1D("TH1purity","purity",Nbin,xmin,xmax);
+    double_t sum_integral;
+    double_t Vpurity[Nbin];
 
     for(int i=0;i<Nbin;i+=1)
     {
@@ -219,28 +263,51 @@ void MC()
             TH1purity->SetBinContent(i,cut_integral);
             Vpurity[i]=cut_integral;
         }
-        x+=h;
-        
     }
 
+    //Draw 2D graph
     TGraph *GraphPurEff = new TGraph (Nbin,Vefficiency,Vpurity);
+    GraphPurEff->SetTitle("Purity / Efficiency");
+    GraphPurEff->GetHistogram()->GetXaxis()->SetTitle("Efficiency");
+    GraphPurEff->GetHistogram()->GetYaxis()->SetTitle("Purity");
+    TGraph *GraphRejEff = new TGraph (Nbin,Vefficiency,Vrejection);
+    GraphRejEff->SetTitle("Rejection / Efficiency");
+    GraphRejEff->GetHistogram()->GetXaxis()->SetTitle("Efficiency");
+    GraphRejEff->GetHistogram()->GetYaxis()->SetTitle("Rejection");
 
-    TCanvas* c2 = new TCanvas("bphysicsbkg","bphysics bkg",900,900) ;
-	c2->Divide(2,2);
-	c2->cd(1);
-	gPad->SetLeftMargin(0.15) ;  GraphPurEff->Draw() ;
-	
+    //Create the canvas to plot the results
+    TCanvas* c = new TCanvas("ResultsTIPP","ResultsTIPP",900,450) ;
+	c->Divide(2,1);
+	c->cd(1);
+	gPad->SetLeftMargin(0.15) ;  GraphPurEff->Draw("AL") ;
+    c->cd(2);
+	gPad->SetLeftMargin(0.15) ;  GraphRejEff->Draw("AL") ;
 
-    //TH1D *TH1PurEff = new TH1D("TH1PurEff","Purity(efficiency)",100,0,1);
-    //double_t y;
-   
-    //for(int i=0;i<Nbin;i+=1)
+    TCanvas* d = new TCanvas("ResultsTIPP2","ResultsTIPP2",1350,900) ;
+	d->Divide(3,2);
+	d->cd(1);
+	gPad->SetLeftMargin(0.15) ;  TH1efficiency->Draw() ;
+    d->cd(2);
+	gPad->SetLeftMargin(0.15) ;  TH1rejection->Draw() ;
+    d->cd(3);
+	gPad->SetLeftMargin(0.15) ;  TH1purity->Draw() ;
+    d->cd(4);
+	gPad->SetLeftMargin(0.15) ;  Bkg->Draw("HIST") ;
+    d->cd(5);
+	gPad->SetLeftMargin(0.15) ;  missE->Draw() ;
+    d->cd(6);
+	gPad->SetLeftMargin(0.15) ;  sumbkgsig->Draw("HIST") ;
+
+    //Useful for different sigEmiss comparison
+    //ofstream Vectors("vectors.txt");
+    //ofstream Vectors("vectors.txt",std::ios_base::app); //without erasing
+    //for (int i=0;i<Nbin;i++)
     //{
-    //    GraphPurEff->GetPoint(i, x, y);
-    //    TH1PurEff->SetBinContent(i,y);
-    //S}
-    
-	
+    //    Vectors<<Vefficiency[i]<<" "<<Vpurity[i]<<" "<<Vrejection[i]<<endl;
+    //}
+    //Vectors.close();
+
+    //GraphEff(Nbin);
 
     tree->Fill();
     ftree->Write();
@@ -248,6 +315,7 @@ void MC()
     //Draw the Dalitz plot
     //tree->Draw("m23_2:m12_2>>(250,0,25,300,0,30)","","colz");
 
-    ftree->Close();
-    file.close();
+    //ftree->Close();
+    //f1->Close();
+    //file.close();
 }

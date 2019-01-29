@@ -53,4 +53,26 @@ void test() {
 	gPad->SetLeftMargin(0.15) ; gr1->Draw() ;
    c2->cd(4);
 	gPad->SetLeftMargin(0.15) ; //gcumuhisto->Draw() ;
+
+   TH1D *m23c = new TH1D("m23c","Missing energy",Nbin,0,25);
+    tree->Draw("Dalitz.m23_2>>m23c","","goff");
+    TH1D *m12c = new TH1D("m12c","Missing energy",Nbin,0,30);
+    tree->Draw("Dalitz.m12_2>>m12c","","goff");
+    TH2D *testf = new TH2D("testf","idfvf",Nbin,0,25,Nbin,0,30);
+
+    double_t x1=0,x2=0,k1,k2;
+    double_t h1=25.0/Nbin,h2=30.0/Nbin;
+
+    for(int i=0;i<Nbin;i++)
+    {
+        k1 = m23c->FindFixBin(x1);
+        x2=0;
+        for(int j=0;j<Nbin;j++)
+        {
+            k2 = m12c->FindFixBin(x2);
+            testf->SetBinContent(k1,k2,1.0);
+            x2+=h2;
+        }
+        x1+=h1;
+    }
 }
