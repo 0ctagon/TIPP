@@ -27,7 +27,8 @@ void MC()
     Particle NuNu;
     Dalitz dalitz;
 
-    int nbevts = 10000;
+    double_t SignalBkgProp = 0.00001;
+    int nbevts = 722287*SignalBkgProp;
 
     //Define the tree, each branch is a particle
     TFile *ftree = new TFile("MC.root","recreate");
@@ -49,7 +50,7 @@ void MC()
     //RooRealVar mb("mb","mass b0",5.27962);
     //RooRealVar mk("mk","mass k*0",0.89581);
 
-    double_t EmissRes = 0.3;
+    double_t EmissRes = 0.05;
 
     //Define the 4-vectors for e-/e+ & Upsilon 4S
     TLorentzVector Qp(-Ep.getVal(),0,0,Ep.getVal());
@@ -179,32 +180,14 @@ void MC()
         
     }
 
-    //TrueBkg_CDM to lab frame
+    //TrueBkg_com to lab frame
     int Nbin=100;
-    double_t xmin=0.0,xmax=6.;
+    double_t xmin=0.0,xmax=7.;
     TFile* f1 = new TFile("missingEnergy.root");
     TTree* t1 = (TTree*)f1->Get("tree");
 
-    TH1D *Hpx_cdm = new TH1D("Hpx_cdm","Hpx_cdm",Nbin,xmin,xmax);
-    t1->Draw("px_cdm>>Hpx_cdm","","goff");
-    Hpx_cdm->Scale(betaU.X());
-    TH1D *Hpy_cdm = new TH1D("Hpy_cdm","Hpy_cdm",Nbin,xmin,xmax);
-    t1->Draw("py_cdm>>Hpy_cdm","","goff");
-    Hpy_cdm->Scale(betaU.Y());
-    TH1D *Hpz_cdm = new TH1D("Hpz_cdm","Hpz_cdm",Nbin,xmin,xmax);
-    t1->Draw("pz_cdm>>Hpz_cdm","","goff");
-    Hpz_cdm->Scale(betaU.Z());
-
-    TH1D *Enunu_cdm = new TH1D("Enunu_cdm","Enunu_cdm",Nbin,xmin,xmax);
-    t1->Draw("E_cdm>>Enunu_cdm","","goff");
-
-    double_t gammaU = 1/sqrt(1-betaU*betaU);
-
     TH1D *Bkg = new TH1D("Bkg","Bkg",Nbin,xmin,xmax);
-    Bkg->Add(Enunu_cdm,Hpx_cdm,1,1);
-    Bkg->Add(Hpy_cdm,1);
-    Bkg->Add(Hpz_cdm,1);
-    Bkg->Scale(gammaU);
+    t1->Draw("E>>Bkg","","goff");
 
     //Draw efficacity histogram
     
@@ -215,9 +198,9 @@ void MC()
 
     double_t full_integral = missE->Integral(), cut_integral;
     double h = xmax/Nbin;
-    double_t Vefficiency[Nbin];
+    double_t Vefficiency[Nbin+1];
 
-    for(int i=0;i<Nbin;i+=1)
+    for(int i=0;i<Nbin+1;i+=1)
     {
         cut_integral = missE->Integral(i,Nbin)/full_integral;
         TH1efficiency->SetBinContent(i,cut_integral);
@@ -234,10 +217,10 @@ void MC()
 
     //Draw rejection histogram
     TH1D *TH1rejection = new TH1D("TH1rejection","rejection",Nbin,xmin,xmax);
-    double_t Vrejection[Nbin];
+    double_t Vrejection[Nbin+1];
     full_integral = Bkg->Integral();
 
-    for(int i=0;i<Nbin;i+=1)
+    for(int i=0;i<Nbin+1;i+=1)
     {
         cut_integral = Bkg->Integral(i,Nbin)/full_integral;
         TH1rejection->SetBinContent(i,1-cut_integral);
@@ -247,12 +230,12 @@ void MC()
     //Draw purity histogram
     TH1D *TH1purity = new TH1D("TH1purity","purity",Nbin,xmin,xmax);
     double_t sum_integral;
-    double_t Vpurity[Nbin];
+    double_t Vpurity[Nbin+1];
 
-    for(int i=0;i<Nbin;i+=1)
+    for(int i=0;i<Nbin+1;i+=1)
     {
         sum_integral = sumbkgsig->Integral(i,Nbin);
-        cut_integral = missE->Integral(i,Nbin)/sum_integral;
+        cut_integral = missE->Integral(i,Nbin);
         if(sum_integral<0.01)
         {
             TH1purity->SetBinContent(i, 0.0);
@@ -260,8 +243,8 @@ void MC()
         }
         else
         {
-            TH1purity->SetBinContent(i,cut_integral);
-            Vpurity[i]=cut_integral;
+            TH1purity->SetBinContent(i,cut_integral/sum_integral);
+            Vpurity[i]=cut_integral/sum_integral;
         }
     }
 
@@ -292,22 +275,33 @@ void MC()
     d->cd(3);
 	gPad->SetLeftMargin(0.15) ;  TH1purity->Draw() ;
     d->cd(4);
-	gPad->SetLeftMargin(0.15) ;  Bkg->Draw("HIST") ;
+	gPad->SetLeftMargin(0.15) ;  Bkg->Draw() ;
     d->cd(5);
 	gPad->SetLeftMargin(0.15) ;  missE->Draw() ;
     d->cd(6);
 	gPad->SetLeftMargin(0.15) ;  sumbkgsig->Draw("HIST") ;
 
     //Useful for different sigEmiss comparison
-    //ofstream Vectors("vectors.txt");
-    //ofstream Vectors("vectors.txt",std::ios_base::app); //without erasing
-    //for (int i=0;i<Nbin;i++)
+    //ofstream fileEmissVect("sigEmiss.txt");
+    //ofstream fileEmissVect("sigEmiss.txt",std::ios_base::app); //without erasing
+    //for (int i=0;i<Nbin+1;i++)
     //{
-    //    Vectors<<Vefficiency[i]<<" "<<Vpurity[i]<<" "<<Vrejection[i]<<endl;
+    //    fileEmissVect<<Vefficiency[i]<<" "<<Vpurity[i]<<" "<<Vrejection[i]<<endl;
     //}
-    //Vectors.close();
+    //fileEmissVect.close();
 
-    //GraphEff(Nbin);
+    //GraphEffEmiss(Nbin+1);
+
+    //Useful for different signal/bkg comparison
+    //ofstream fileSignal("SignalBkgProp.txt");
+    //ofstream fileSignal("SignalBkgProp.txt",std::ios_base::app); //without erasing
+    //for (int i=0;i<Nbin+1;i++)
+    //{
+    //    fileSignal<<Vefficiency[i]<<" "<<Vpurity[i]<<" "<<Vrejection[i]<<endl;
+    //}
+    //fileSignal.close();
+
+    GraphEffSignal(Nbin+1);
 
     tree->Fill();
     ftree->Write();
@@ -317,5 +311,5 @@ void MC()
 
     //ftree->Close();
     //f1->Close();
-    //file.close();
+    //file.Close();
 }
