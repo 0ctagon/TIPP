@@ -27,8 +27,7 @@ void MC()
     Particle NuNu;
     Dalitz dalitz;
 
-    double_t SignalBkgProp = 0.00001;
-    int nbevts = 722287*SignalBkgProp;
+    int nbevts = 100000;
 
     //Define the tree, each branch is a particle
     TFile *ftree = new TFile("MC.root","recreate");
@@ -49,8 +48,6 @@ void MC()
     RooRealVar mk("mk","mass k*+/-",0.89166);
     //RooRealVar mb("mb","mass b0",5.27962);
     //RooRealVar mk("mk","mass k*0",0.89581);
-
-    double_t EmissRes = 0.05;
 
     //Define the 4-vectors for e-/e+ & Upsilon 4S
     TLorentzVector Qp(-Ep.getVal(),0,0,Ep.getVal());
@@ -80,6 +77,13 @@ void MC()
     RooAbsPdf* m12distribution = m12distrib(m12);
     RooAbsReal * m12Cdf = m12distribution->createCdf(m12);
     TF1 * m12CdfTH1 = m12Cdf->asTF(m12);
+
+    //List for different resolution comparison
+    double_t QnunuE5[nbevts];
+    double_t QnunuE10[nbevts];
+    double_t QnunuE30[nbevts];
+    int k=0;
+    double_t sigEmiss;
 
     for(int i=0;i<nbevts;i++)
     {
@@ -113,8 +117,14 @@ void MC()
         TLorentzVector Qk = TransfoLorentz(betaB1, costheta1, phi1, pK, EK);
         TLorentzVector Qnunu = TransfoLorentz(betaB1, costheta1, phi1, pnunu, Enunu);
 
-        double_t sigEmiss = random->Gaus(0,Qnunu.E()*EmissRes);
-        Qnunu.SetE(Qnunu.E()+sigEmiss);
+        //Resolution study
+        sigEmiss = random->Gaus(0,Qnunu.E()*0.05);
+        QnunuE5[k]=Qnunu.E()+sigEmiss;
+        sigEmiss = random->Gaus(0,Qnunu.E()*0.1);
+        QnunuE10[k]=Qnunu.E()+sigEmiss;
+        sigEmiss = random->Gaus(0,Qnunu.E()*0.3);
+        QnunuE30[k]=Qnunu.E()+sigEmiss;
+        k+=1;
 
         //Calculate the 4-vector for nu1 & nu2
         TVector3 betanunu = Boost(Qnunu);
@@ -180,117 +190,241 @@ void MC()
         
     }
 
-    //TrueBkg_com to lab frame
+    //Purity/Efficiency/Rejection study
     int Nbin=100;
-    double_t xmin=0.0,xmax=7.;
+    double_t xmin=0.0,xmax=10;
+
+    //Different resolution TH1
+    TH1D *missE5 = new TH1D("missE5","missE5",Nbin,xmin,xmax);
+    TH1D *missE10 = new TH1D("missE10","missE10",Nbin,xmin,xmax);
+    TH1D *missE30 = new TH1D("missE30","missE30",Nbin,xmin,xmax);
+
+    for(int i=0;i<nbevts;i+=1)
+    {
+        missE5->Fill(QnunuE5[i]);
+        missE10->Fill(QnunuE10[i]);
+        missE30->Fill(QnunuE30[i]);
+    }
+
+    //TrueBkg_com to lab frame
     TFile* f1 = new TFile("missingEnergy.root");
     TTree* t1 = (TTree*)f1->Get("tree");
 
     TH1D *Bkg = new TH1D("Bkg","Bkg",Nbin,xmin,xmax);
     t1->Draw("E>>Bkg","","goff");
 
-    //Draw efficacity histogram
-    
+    //Draw efficiency histogram
     TH1D *missE = new TH1D("missE","Missing energy",Nbin,xmin,xmax);
     tree->Draw("NuNuevent.E>>missE","","goff");
     
     TH1D *TH1efficiency = new TH1D("TH1efficiency","Efficiency",Nbin,xmin,xmax);
+    TH1D *TH1efficiency5 = new TH1D("TH1efficiency5","Efficiency",Nbin,xmin,xmax);
+    TH1D *TH1efficiency10 = new TH1D("TH1efficiency10","Efficiency",Nbin,xmin,xmax);
+    TH1D *TH1efficiency30 = new TH1D("TH1efficiency30","Efficiency",Nbin,xmin,xmax);
 
-    double_t full_integral = missE->Integral(), cut_integral;
-    double h = xmax/Nbin;
     double_t Vefficiency[Nbin+1];
+    double_t Vefficiency5[Nbin+1];
+    double_t Vefficiency10[Nbin+1];
+    double_t Vefficiency30[Nbin+1];
+
+    Efficiency(Vefficiency,missE,Nbin,xmin,xmax);
+    Efficiency(Vefficiency5,missE5,Nbin,xmin,xmax);
+    Efficiency(Vefficiency10,missE10,Nbin,xmin,xmax);
+    Efficiency(Vefficiency30,missE30,Nbin,xmin,xmax);
 
     for(int i=0;i<Nbin+1;i+=1)
     {
-        cut_integral = missE->Integral(i,Nbin)/full_integral;
-        TH1efficiency->SetBinContent(i,cut_integral);
-        Vefficiency[i]=cut_integral;
+        TH1efficiency->SetBinContent(i,Vefficiency[i]);
+        TH1efficiency5->SetBinContent(i,Vefficiency5[i]);
+        TH1efficiency10->SetBinContent(i,Vefficiency10[i]);
+        TH1efficiency30->SetBinContent(i,Vefficiency30[i]);
     }
-
-    //Create fake bkg
-    //TH1D *fakebkg = new TH1D("fakebkg","fakebkg",Nbin,xmin,xmax);
-    //fakebkg->FillRandom("gaus",nbevts*10);
-
-    //Add bkg with signal
-    TH1D *sumbkgsig = new TH1D("sumbkgsig","sumbkgsig",Nbin,xmin,xmax);
-    sumbkgsig->Add(Bkg,missE);
+    
 
     //Draw rejection histogram
     TH1D *TH1rejection = new TH1D("TH1rejection","rejection",Nbin,xmin,xmax);
+
     double_t Vrejection[Nbin+1];
-    full_integral = Bkg->Integral();
+    Rejection(Vrejection,Bkg,Nbin,xmin,xmax);
 
     for(int i=0;i<Nbin+1;i+=1)
     {
-        cut_integral = Bkg->Integral(i,Nbin)/full_integral;
-        TH1rejection->SetBinContent(i,1-cut_integral);
-        Vrejection[i]=1-cut_integral;
+        TH1rejection->SetBinContent(i,Vrejection[i]);
     }
+
+
+    //Add bkg with signal
+    TH1D *sumbkgsig = new TH1D("sumbkgsig","sumbkgsig",Nbin,xmin,xmax);
+    TH1D *sumbkgsig5 = new TH1D("sumbkgsig5","sumbkgsig",Nbin,xmin,xmax);
+    TH1D *sumbkgsig10 = new TH1D("sumbkgsig10","sumbkgsig",Nbin,xmin,xmax);
+    TH1D *sumbkgsig30 = new TH1D("sumbkgsig30","sumbkgsig",Nbin,xmin,xmax);
+    sumbkgsig->Add(Bkg,missE);
+    sumbkgsig5->Add(Bkg,missE5);
+    sumbkgsig10->Add(Bkg,missE10);
+    sumbkgsig30->Add(Bkg,missE30);
 	
     //Draw purity histogram
     TH1D *TH1purity = new TH1D("TH1purity","purity",Nbin,xmin,xmax);
-    double_t sum_integral;
+    TH1D *TH1purity5 = new TH1D("TH1purity5","purity",Nbin,xmin,xmax);
+    TH1D *TH1purity10 = new TH1D("TH1purity10","purity",Nbin,xmin,xmax);
+    TH1D *TH1purity30 = new TH1D("TH1purity30","purity",Nbin,xmin,xmax);
+    
     double_t Vpurity[Nbin+1];
+    double_t Vpurity5[Nbin+1];
+    double_t Vpurity10[Nbin+1];
+    double_t Vpurity30[Nbin+1];
+
+    Purity(Vpurity,sumbkgsig,missE,Nbin,xmin,xmax);
+    Purity(Vpurity5,sumbkgsig5,missE5,Nbin,xmin,xmax);
+    Purity(Vpurity10,sumbkgsig10,missE10,Nbin,xmin,xmax);
+    Purity(Vpurity30,sumbkgsig30,missE30,Nbin,xmin,xmax);
 
     for(int i=0;i<Nbin+1;i+=1)
     {
-        sum_integral = sumbkgsig->Integral(i,Nbin);
-        cut_integral = missE->Integral(i,Nbin);
-        if(sum_integral<0.01)
+        TH1purity->SetBinContent(i,Vpurity[i]);
+        TH1purity5->SetBinContent(i,Vpurity5[i]);
+        TH1purity10->SetBinContent(i,Vpurity10[i]);
+        TH1purity30->SetBinContent(i,Vpurity30[i]);
+    }
+
+
+    //Significance study
+    TH1D *TH1significance = new TH1D("TH1significance","significance",Nbin,xmin,xmax);
+    double_t Vsignificance[Nbin];
+
+    double_t cut_bkg,cut_signal;
+    double_t fraction=10;
+
+    for(int i=0;i<Nbin+1;i+=1)
+    {
+        cut_bkg = Bkg->Integral(i,Nbin+1);
+        cut_signal = missE->Integral(i,Nbin+1);
+
+        if((sqrt(cut_signal+fraction*cut_bkg))<0.001)
         {
-            TH1purity->SetBinContent(i, 0.0);
-            Vpurity[i]=0;
+            Vsignificance[i]=0.0;
         }
         else
         {
-            TH1purity->SetBinContent(i,cut_integral/sum_integral);
-            Vpurity[i]=cut_integral/sum_integral;
+            Vsignificance[i] = (sqrt(nbevts)*cut_signal)/(sqrt(cut_signal+fraction*cut_bkg));
         }
+
+        TH1significance->SetBinContent(i,Vsignificance[i]);
     }
 
     //Draw 2D graph
     TGraph *GraphPurEff = new TGraph (Nbin,Vefficiency,Vpurity);
     GraphPurEff->SetTitle("Purity / Efficiency");
     GraphPurEff->GetHistogram()->GetXaxis()->SetTitle("Efficiency");
-    GraphPurEff->GetHistogram()->GetYaxis()->SetTitle("Purity");
+    GraphPurEff->GetHistogram()->GetYaxis()->SetTitle("Purity"); 
+    GraphPurEff->SetMarkerStyle(2);
     TGraph *GraphRejEff = new TGraph (Nbin,Vefficiency,Vrejection);
     GraphRejEff->SetTitle("Rejection / Efficiency");
     GraphRejEff->GetHistogram()->GetXaxis()->SetTitle("Efficiency");
     GraphRejEff->GetHistogram()->GetYaxis()->SetTitle("Rejection");
+    GraphRejEff->SetMarkerStyle(2);
+    TGraph *GraphPurEff5 = new TGraph (Nbin,Vefficiency5,Vpurity5);
+    GraphPurEff5->SetLineColor(2);
+    GraphPurEff5->SetMarkerStyle(2);
+    GraphPurEff5->SetMarkerColor(2);
+    TGraph *GraphRejEff5 = new TGraph (Nbin,Vefficiency5,Vrejection);
+    GraphRejEff5->SetLineColor(2);
+    GraphRejEff5->SetMarkerStyle(2);
+    GraphRejEff5->SetMarkerColor(2);
+    TGraph *GraphPurEff10 = new TGraph (Nbin,Vefficiency10,Vpurity10);
+    GraphPurEff10->SetLineColor(4);
+    GraphPurEff10->SetMarkerStyle(2);
+    GraphPurEff10->SetMarkerColor(4);
+    TGraph *GraphRejEff10 = new TGraph (Nbin,Vefficiency10,Vrejection);
+    GraphRejEff10->SetLineColor(4);
+    GraphRejEff10->SetMarkerStyle(2);
+    GraphRejEff10->SetMarkerColor(4);
+    TGraph *GraphPurEff30 = new TGraph (Nbin,Vefficiency30,Vpurity30);
+    GraphPurEff30->SetLineColor(8);
+    GraphPurEff30->SetMarkerStyle(2);
+    GraphPurEff30->SetMarkerColor(8);
+    TGraph *GraphRejEff30 = new TGraph (Nbin,Vefficiency30,Vrejection);
+    GraphRejEff30->SetLineColor(8);
+    GraphRejEff30->SetMarkerStyle(2);
+    GraphRejEff30->SetMarkerColor(8);
 
     //Create the canvas to plot the results
+    missE5->SetLineColor(2);
+    missE10->SetLineColor(4);
+    missE30->SetLineColor(8);
+
+    TH1efficiency5->SetLineColor(2);
+    TH1efficiency10->SetLineColor(4);
+    TH1efficiency30->SetLineColor(8);
+
+    TH1purity->SetMaximum(1.);
+    TH1purity5->SetLineColor(2);
+    TH1purity10->SetLineColor(4);
+    TH1purity30->SetLineColor(8);
+
     TCanvas* c = new TCanvas("ResultsTIPP","ResultsTIPP",900,450) ;
 	c->Divide(2,1);
 	c->cd(1);
-	gPad->SetLeftMargin(0.15) ;  GraphPurEff->Draw("AL") ;
+	gPad->SetLeftMargin(0.15) ;  
+    GraphPurEff30->Draw("APL") ;
+    GraphPurEff->Draw("same,PL") ;
+    GraphPurEff5->Draw("same,PL") ;
+    GraphPurEff10->Draw("same,PL") ;
     c->cd(2);
-	gPad->SetLeftMargin(0.15) ;  GraphRejEff->Draw("AL") ;
+	gPad->SetLeftMargin(0.15) ;  
+    GraphRejEff->Draw("APL") ; 
+    GraphRejEff5->Draw("same,PL") ;
+    GraphRejEff10->Draw("same,PL") ;
+    GraphRejEff30->Draw("same,PL") ;
 
     TCanvas* d = new TCanvas("ResultsTIPP2","ResultsTIPP2",1350,900) ;
 	d->Divide(3,2);
 	d->cd(1);
-	gPad->SetLeftMargin(0.15) ;  TH1efficiency->Draw() ;
+	gPad->SetLeftMargin(0.15) ;  
+    TH1efficiency->Draw() ;
+    TH1efficiency5->Draw("same") ;
+    TH1efficiency10->Draw("same") ;
+    TH1efficiency30->Draw("same") ;
+
     d->cd(2);
-	gPad->SetLeftMargin(0.15) ;  TH1rejection->Draw() ;
+	gPad->SetLeftMargin(0.15) ;  
+    TH1rejection->Draw() ;
+
     d->cd(3);
-	gPad->SetLeftMargin(0.15) ;  TH1purity->Draw() ;
+	gPad->SetLeftMargin(0.15) ;
+    TH1purity->Draw() ;  
+    TH1purity30->Draw("same") ;  
+    TH1purity5->Draw("same") ;  
+    TH1purity10->Draw("same") ;
+
     d->cd(4);
-	gPad->SetLeftMargin(0.15) ;  Bkg->Draw() ;
+	gPad->SetLeftMargin(0.15) ;  
+    Bkg->Draw() ;
+
     d->cd(5);
-	gPad->SetLeftMargin(0.15) ;  missE->Draw() ;
+	gPad->SetLeftMargin(0.15) ;  
+    missE->Draw() ; 
+    missE5->Draw("same"); 
+    missE10->Draw("same"); 
+    missE30->Draw("same");
+
     d->cd(6);
-	gPad->SetLeftMargin(0.15) ;  sumbkgsig->Draw("HIST") ;
+	//gPad->SetLeftMargin(0.15) ;  
+   // sumbkgsig30->Draw() ;
+   // missE30->Draw("same,HIST");
+   // gPad->SetLogy();
+    TH1significance->Draw();
 
-    //Useful for different sigEmiss comparison
-    //ofstream fileEmissVect("sigEmiss.txt");
-    //ofstream fileEmissVect("sigEmiss.txt",std::ios_base::app); //without erasing
-    //for (int i=0;i<Nbin+1;i++)
-    //{
-    //    fileEmissVect<<Vefficiency[i]<<" "<<Vpurity[i]<<" "<<Vrejection[i]<<endl;
-    //}
-    //fileEmissVect.close();
-
-    //GraphEffEmiss(Nbin+1);
+    TLegend *leg = new TLegend( .58, .65, .9, .9, "Emiss Resolution");
+    leg->SetTextSize(0.04);
+    leg->SetFillColor(0);
+    leg->SetFillStyle(1001);
+    leg->AddEntry( GraphPurEff, "0\%", "lp");
+    leg->AddEntry( GraphPurEff5, "5\%", "lp");
+    leg->AddEntry( GraphPurEff10, "10\%", "lp");
+    leg->AddEntry( GraphPurEff30, "30\%", "lp");
+    c->cd(1);leg->Draw();
+    d->cd(2);leg->Draw();
 
     //Useful for different signal/bkg comparison
     //ofstream fileSignal("SignalBkgProp.txt");

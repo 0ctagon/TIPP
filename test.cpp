@@ -75,4 +75,82 @@ void test() {
         }
         x1+=h1;
     }
+
+    
+}
+
+void GraphEffEmiss(int N)
+{
+    double_t Veff1[N],Vpur1[N],Vrej1[N];
+    double_t Veff2[N],Vpur2[N],Vrej2[N];
+    double_t Veff3[N],Vpur3[N],Vrej3[N];
+
+    ifstream Vect("sigEmiss.txt");
+    for (int i=0;i<N;i++)
+    {
+        Vect >> Veff1[i] >> Vpur1[i] >> Vrej1[i];
+    }
+    for (int i=0;i<N;i++)
+    {
+        Vect >> Veff2[i] >> Vpur2[i] >> Vrej2[i];
+    }
+    for (int i=0;i<N;i++)
+    {
+        Vect >> Veff3[i] >> Vpur3[i] >> Vrej3[i];
+    }
+
+    TGraph *GraphPurEff1 = new TGraph (N,Veff1,Vpur1);
+    GraphPurEff1->SetTitle("Purity / Efficiency");
+    GraphPurEff1->GetHistogram()->GetXaxis()->SetTitle("Efficiency");
+    GraphPurEff1->GetHistogram()->GetYaxis()->SetTitle("Purity");
+    GraphPurEff1->GetHistogram()->SetMaximum(0.06);
+    GraphPurEff1->SetLineColor(2);
+    GraphPurEff1->SetMarkerStyle(2);
+    GraphPurEff1->SetMarkerColor(2);
+    TGraph *GraphRejEff1 = new TGraph (N,Veff1,Vrej1);
+    GraphRejEff1->SetTitle("Rejection / Efficiency");
+    GraphRejEff1->GetHistogram()->GetXaxis()->SetTitle("Efficiency");
+    GraphRejEff1->GetHistogram()->GetYaxis()->SetTitle("Rejection");
+    GraphRejEff1->GetHistogram()->GetYaxis()->SetTitleOffset(1.2);
+    GraphRejEff1->SetLineColor(2);
+    GraphRejEff1->SetMarkerStyle(2);
+    GraphRejEff1->SetMarkerColor(2);
+
+    TGraph *GraphPurEff2 = new TGraph (N,Veff2,Vpur2);
+    GraphPurEff2->SetLineColor(4);
+    GraphPurEff2->SetMarkerStyle(2);
+    GraphPurEff2->SetMarkerColor(4);
+    TGraph *GraphRejEff2 = new TGraph (N,Veff2,Vrej2);
+    GraphRejEff2->SetLineColor(4);
+    GraphRejEff2->SetMarkerStyle(2);
+    GraphRejEff2->SetMarkerColor(4);
+    TGraph *GraphPurEff3 = new TGraph (N,Veff3,Vpur3);
+    GraphPurEff3->SetLineColor(8);
+    GraphPurEff3->SetMarkerStyle(2);
+    GraphPurEff3->SetMarkerColor(8);
+    TGraph *GraphRejEff3 = new TGraph (N,Veff3,Vrej3);
+    GraphRejEff3->SetLineColor(8);
+    GraphRejEff3->SetMarkerStyle(2);
+    GraphRejEff3->SetMarkerColor(8);
+
+    TCanvas* c = new TCanvas("comparisonsigEmiss","comparison sigEmiss",900,450) ;
+	c->Divide(2,1);
+	c->cd(1);
+	GraphPurEff1->Draw("APL") ;
+    GraphPurEff2->Draw("same,PL") ;
+    GraphPurEff3->Draw("same,PL") ;
+    c->cd(2);
+	GraphRejEff1->Draw("APL") ;
+    GraphRejEff2->Draw("same,PL") ;
+    GraphRejEff3->Draw("same,PL") ;
+
+    TLegend *leg = new TLegend( .58, .65, .9, .9, "Emiss Resolution");
+    leg->SetTextSize(0.04);
+    leg->SetFillColor(0);
+    leg->SetFillStyle(1001);
+    leg->AddEntry( GraphPurEff1, "5\%", "lp");
+    leg->AddEntry( GraphPurEff2, "10\%", "lp");
+    leg->AddEntry( GraphPurEff3, "30\%", "lp");
+    c->cd(1);leg->Draw();
+    Vect.close();
 }
