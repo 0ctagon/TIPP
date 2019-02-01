@@ -29,6 +29,142 @@ TLorentzVector TransfoLorentz(TVector3 b, RooRealVar costheta, RooRealVar phi, d
     return Q;
 }
 
+void Efficiency(double_t* Veff, TH1* THv, TH1* hist,int Nbin, double_t xmin, double_t xmax)
+{
+    double_t full_integral = hist->Integral(), cut_integral;
+    double h = xmax/Nbin;
+
+    for(int i=0;i<Nbin+1;i+=1)
+    {
+        cut_integral = hist->Integral(i,Nbin)/full_integral;
+        Veff[i]=cut_integral;
+        THv->SetBinContent(i,Veff[i]);
+    }
+}
+
+void Rejection(double_t* Vrej, TH1* THv, TH1* hist, int Nbin, double_t xmin, double_t xmax)
+{
+    double_t cut_integral;
+    double_t full_integral = hist->Integral();
+
+    for(int i=0;i<Nbin+1;i+=1)
+    {
+        cut_integral = hist->Integral(i,Nbin)/full_integral;
+        Vrej[i]=1-cut_integral;
+        THv->SetBinContent(i,Vrej[i]);
+    }
+}
+
+void Purity(double_t* Vpur, TH1* THv, TH1* histbkg, TH1* histE, int Nbin, double_t xmin, double_t xmax)
+{
+    double_t sum_integral, cut_integral;
+
+    for(int i=0;i<Nbin+1;i+=1)
+    {
+        sum_integral = histbkg->Integral(i,Nbin+1);
+        cut_integral = histE->Integral(i,Nbin+1);
+
+        if(sum_integral<0.001)
+        {
+            Vpur[i]=0.0;
+        }
+        else
+        {
+            Vpur[i]=cut_integral/sum_integral;
+        }
+        THv->SetBinContent(i,Vpur[i]);
+    }
+}
+
+double_t SignificanceTH(TH1* TH1sign, TH1* histEff, TH1* histRej, int Nbin, int Nbkg, int f, double_t xmin, double_t xmax, bool cut)
+{
+    double_t Vsignificance[Nbin];
+
+    double_t eff,rej;
+
+    for(int i=0;i<Nbin+1;i+=1)
+    {
+        eff = histEff->GetBinContent(i-1);
+        rej = 1-histRej->GetBinContent(i-1);
+
+        if((sqrt(eff+f*rej))<0.001)
+        {
+            Vsignificance[i]=0.0;
+        }
+        else
+        {
+            Vsignificance[i] = (sqrt(Nbkg/f)*eff)/(sqrt(eff+f*rej));
+        }
+
+        TH1sign->SetBinContent(i,Vsignificance[i]);
+    }
+
+    double_t value;
+    if(cut)
+    {
+        value = ((xmax-xmin)/Nbin)*(TH1sign->GetMaximumBin()-0.5);
+    }
+    else
+    {
+        value = TH1sign->GetMaximum();
+    }
+    
+    return value;
+}
+
+TH1D *TH1sign = new TH1D("TH1sign","purity",100,0.0,7.0);
+
+double_t Significance(TH1* histEff, TH1* histRej, int Nbin, int Nbkg, int f, double_t xmin, double_t xmax, bool cut)
+{
+    TH1sign->BufferEmpty();
+    double_t Vsignificance[Nbin];
+
+    double_t eff,rej;
+
+    for(int i=0;i<Nbin+1;i+=1)
+    {
+        eff = histEff->GetBinContent(i-1);
+        rej = 1-histRej->GetBinContent(i-1);
+
+        if((sqrt(eff+f*rej))<0.001)
+        {
+            Vsignificance[i]=0.0;
+        }
+        else
+        {
+            Vsignificance[i] = (sqrt(Nbkg/f)*eff)/(sqrt(eff+f*rej));
+        }
+
+        TH1sign->SetBinContent(i,Vsignificance[i]);
+    }
+
+    double_t value;
+    if(cut)
+    {
+        value = ((xmax-xmin)/Nbin)*(TH1sign->GetMaximumBin()-0.5);
+    }
+    else
+    {
+        value = TH1sign->GetMaximum();
+    }
+
+    return value;
+}
+
+struct Particle{
+   	double_t E;
+    double_t P;
+    double_t Px;
+    double_t Py;
+    double_t Pz;
+    double_t Costheta;
+    double_t Phi;
+};
+
+struct Dalitz{
+    double_t m12;
+    double_t m23;
+};
 
 void GraphEffSignal(int N)
 {
@@ -113,6 +249,7 @@ void GraphEffSignal(int N)
     TCanvas* c = new TCanvas("comparisonSignalBkg","comparison SignalBkg",900,450) ;
 	c->Divide(2,1);
 	c->cd(1);
+	gPad->SetLeftMargin(0.15) ;  
 	GraphPurEff1->Draw("APL") ;
     GraphPurEff2->Draw("same,PL") ;
     GraphPurEff3->Draw("same,PL") ;
@@ -120,6 +257,7 @@ void GraphEffSignal(int N)
     //GraphPurEff5->Draw("same,PL") ;
     gPad->SetLogy();
     c->cd(2);
+	gPad->SetLeftMargin(0.15) ;  
 	GraphRejEff1->Draw("APL") ;
     GraphRejEff2->Draw("same,PL") ;
     GraphRejEff3->Draw("same,PL") ;
@@ -137,63 +275,3 @@ void GraphEffSignal(int N)
     leg->Draw();
     Vect.close();
 }
-
-void Efficiency(double_t* Veff, TH1* hist,int Nbin, double_t xmin, double_t xmax)
-{
-    double_t full_integral = hist->Integral(), cut_integral;
-    double h = xmax/Nbin;
-
-    for(int i=0;i<Nbin+1;i+=1)
-    {
-        cut_integral = hist->Integral(i,Nbin)/full_integral;
-        Veff[i]=cut_integral;
-    }
-}
-
-void Rejection(double_t* Vrej, TH1* hist, int Nbin, double_t xmin, double_t xmax)
-{
-    double_t cut_integral;
-    double_t full_integral = hist->Integral();
-
-    for(int i=0;i<Nbin+1;i+=1)
-    {
-        cut_integral = hist->Integral(i,Nbin)/full_integral;
-        Vrej[i]=1-cut_integral;
-    }
-}
-
-void Purity(double_t* Vpur, TH1* histbkg, TH1* histE, int Nbin, double_t xmin, double_t xmax)
-{
-    double_t sum_integral, cut_integral;
-
-    for(int i=0;i<Nbin+1;i+=1)
-    {
-        sum_integral = histbkg->Integral(i,Nbin+1);
-        cut_integral = histE->Integral(i,Nbin+1);
-
-        if(sum_integral<0.001)
-        {
-            Vpur[i]=0.0;
-        }
-        else
-        {
-            Vpur[i]=cut_integral/sum_integral;
-        }
-    }
-}
-
-struct Particle{
-   	double_t E;
-    double_t P;
-    double_t Px;
-    double_t Py;
-    double_t Pz;
-    double_t Costheta;
-    double_t Phi;
-};
-
-struct Dalitz{
-    double_t m12;
-    double_t m23;
-};
-
