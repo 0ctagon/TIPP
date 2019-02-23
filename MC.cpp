@@ -125,11 +125,11 @@ void MC()
         //Get the value for m12
         m12.setVal(m12CdfTH1->GetX(u));
 
-        //Calculate the impultion and energy of K
+        //Calculate the impulsion and energy of K
         double_t pK = sqrt((pow(mb.getVal(),2)-pow(m12.getVal()+mk.getVal(),2))*(pow(mb.getVal(),2)-pow(m12.getVal()-mk.getVal(),2)))/(2*mb.getVal());
         double_t EK = sqrt(mk.getVal()*mk.getVal()+pK*pK);
         
-        ////Calculate the impultion and energy of 2nu system
+        ////Calculate the impulsion and energy of 2nu system
         double_t pnunu = -pK;
         double_t Enunu = mb.getVal()-EK;
 
@@ -327,9 +327,9 @@ void MC()
     cout<<"Significance values"<<endl;
     cout<<"Fraction:        "<<"1"<<"\t"<<"10"<<"\t"<<"100"<<"\t"<<"1000"<<"\t"<<"100000"<<endl;
     cout<<endl;
-    cout<<"EmissRes: 10\%  "<<setprecision(3)<<S10f1<<"\t"<<S10f10<<"\t"<<S10f100<<"\t"<<S10f1000<<"\t"<<S10f100000<<endl;
-    cout<<"EmissRes: 20\%  "<<setprecision(3)<<S20f1<<"\t"<<S20f10<<"\t"<<S20f100<<"\t"<<S20f1000<<"\t"<<S20f100000<<endl;
-    cout<<"EmissRes: 30\%  "<<setprecision(3)<<S30f1<<"\t"<<S30f10<<"\t"<<S30f100<<"\t"<<S30f1000<<"\t"<<S30f100000<<endl; 
+    cout<<"Resolution: 10\%  "<<setprecision(3)<<S10f1<<"\t"<<S10f10<<"\t"<<S10f100<<"\t"<<S10f1000<<"\t"<<S10f100000<<endl;
+    cout<<"Resolution: 20\%  "<<setprecision(3)<<S20f1<<"\t"<<S20f10<<"\t"<<S20f100<<"\t"<<S20f1000<<"\t"<<S20f100000<<endl;
+    cout<<"Resolution: 30\%  "<<setprecision(3)<<S30f1<<"\t"<<S30f10<<"\t"<<S30f100<<"\t"<<S30f1000<<"\t"<<S30f100000<<endl; 
     cout<<endl;
 
     //table with cut
@@ -355,9 +355,9 @@ void MC()
     cout<<"Cut values"<<endl;
     cout<<"Fraction:        "<<"1"<<"\t"<<"10"<<"\t"<<"100"<<"\t"<<"1000"<<"\t"<<"100000"<<endl;
     cout<<endl;
-    cout<<"EmissRes: 10\%  "<<setprecision(3)<<S10f1<<"\t"<<S10f10<<"\t"<<S10f100<<"\t"<<S10f1000<<"\t"<<S10f100000<<endl;
-    cout<<"EmissRes: 20\%  "<<setprecision(3)<<S20f1<<"\t"<<S20f10<<"\t"<<S20f100<<"\t"<<S20f1000<<"\t"<<S20f100000<<endl;
-    cout<<"EmissRes: 30\%  "<<setprecision(3)<<S30f1<<"\t"<<S30f10<<"\t"<<S30f100<<"\t"<<S30f1000<<"\t"<<S30f100000<<endl; 
+    cout<<"Resolution: 10\%  "<<setprecision(3)<<S10f1<<"\t"<<S10f10<<"\t"<<S10f100<<"\t"<<S10f1000<<"\t"<<S10f100000<<endl;
+    cout<<"Resolution: 20\%  "<<setprecision(3)<<S20f1<<"\t"<<S20f10<<"\t"<<S20f100<<"\t"<<S20f1000<<"\t"<<S20f100000<<endl;
+    cout<<"Resolution: 30\%  "<<setprecision(3)<<S30f1<<"\t"<<S30f10<<"\t"<<S30f100<<"\t"<<S30f1000<<"\t"<<S30f100000<<endl; 
     cout<<endl;
 
 
@@ -365,44 +365,44 @@ void MC()
     cout<<"____________________"<<endl;
     cout<<"Background to signal fraction and significance study"<<endl;
 	cout<<endl;
-	cout<<"10\% EmissRes"<<endl;
+	cout<<"10\% Resolution"<<endl;
     double_t S;
-	for(int i=100;i<1000;i++)
+	for(int i=1000;i>=100;i--)
 	{
 		S = Significance(TH1efficiency10,TH1rejection,Nbin,nbkg,i,xmin,xmax,false);
         if((S<=3.01) && (S>=2.99))
 		{
 			cout<<"Fraction = "<<i<<" : "<<"Significance = "<<S<<endl;
 		}
-		if((S<=5.02) && (S>=4.99))
+		if((S<=5.02) && (S>=4.98))
 		{
 			cout<<"Fraction = "<<i<<" : "<<"Significance = "<<S<<endl;
 		}
 	}
 	cout<<endl;
-	cout<<"20\% EmissRes"<<endl;
-	for(int i=100;i<1000;i++)
+	cout<<"20\% Resolution"<<endl;
+	for(int i=1000;i>=100;i--)
 	{
 		S = Significance(TH1efficiency20,TH1rejection,Nbin,nbkg,i,xmin,xmax,false);
 		if((S<=3.01) && (S>=2.99))
 		{
 			cout<<"Fraction = "<<i<<" : "<<"Significance = "<<S<<endl;
 		}
-		if((S<=5.02) && (S>=4.99))
+		if((S<=5.02) && (S>=4.98))
 		{
 			cout<<"Fraction = "<<i<<" : "<<"Significance = "<<S<<endl;
 		}
 	}
 	cout<<endl;
-	cout<<"30\% EmissRes"<<endl;
-	for(int i=100;i<1000;i++)
+	cout<<"30\% Resolution"<<endl;
+	for(int i=1000;i>=100;i--)
 	{
 		S = Significance(TH1efficiency30,TH1rejection,Nbin,nbkg,i,xmin,xmax,false);
 		if((S<=3.01) && (S>=2.99))
 		{
 			cout<<"Fraction = "<<i<<" : "<<"Significance = "<<S<<endl;
 		}
-		if((S<=5.02) && (S>=4.99))
+		if((S<=5.02) && (S>=4.98))
 		{
 			cout<<"Fraction = "<<i<<" : "<<"Significance = "<<S<<endl;
 		}
@@ -478,7 +478,7 @@ void MC()
     missE->GetXaxis()->SetTitle("Enunu [GeV]");
     missE->GetYaxis()->SetTitle("Events/0.07 GeV");
 
-    TH1significance1->SetTitle("Significance (10\% EmissRes)");
+    TH1significance1->SetTitle("Significance (10\% Resolution)");
     TH1significance1->GetXaxis()->SetTitle("Cut [GeV]");
     TH1significance1->GetYaxis()->SetTitle("Significance");
     TH1significance1->SetMarkerStyle(0);
@@ -491,7 +491,7 @@ void MC()
     TH1significance5->SetLineColor(28);
     TH1significance5->SetMarkerStyle(0);
 
-    //gStyle->SetOptStat(0);
+    gStyle->SetOptStat(0);
 
     TCanvas* c = new TCanvas("ResultsTIPP","ResultsTIPP",900,450) ;
 	c->Divide(2,1);
@@ -558,7 +558,10 @@ void MC()
     leg->AddEntry( GraphPurEff20, "20\%", "lp");
     leg->AddEntry( GraphPurEff30, "30\%", "lp");
     c->cd(1);leg->Draw();
-    d->cd(2);leg->Draw();
+    c->cd(2);leg->Draw();
+    d->cd(1);leg->Draw();
+    d->cd(3);leg->Draw();
+    d->cd(5);leg->Draw();
 
     TLegend *leg1 = new TLegend( .58, .65, .9, .9, "#Bkg/#Signal");
     leg1->SetTextSize(0.04);
