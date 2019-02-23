@@ -4,12 +4,31 @@
 #include <iostream>
 using namespace std;
 
+//Define the different variables inside a Particle object
+struct Particle{
+   	double_t E;
+    double_t P;
+    double_t Px;
+    double_t Py;
+    double_t Pz;
+    double_t Costheta;
+    double_t Phi;
+};
+
+//Difine the different variables used to get the Dalitz plot
+struct Dalitz{
+    double_t m12;
+    double_t m23;
+};
+
+//Return the boost vector given a 4-vector
 TVector3 Boost(TLorentzVector A)
 {
     TVector3 beta(A.Px()/A.E(),A.Py()/A.E(),A.Pz()/A.E());
     return beta;
 }
 
+//Return a 4-vector in the lab frame
 TLorentzVector TransfoLorentz(TVector3 b, RooRealVar costheta, RooRealVar phi, double_t p, double_t q)
 {
     double_t _Px = p*costheta.getVal();
@@ -29,10 +48,10 @@ TLorentzVector TransfoLorentz(TVector3 b, RooRealVar costheta, RooRealVar phi, d
     return Q;
 }
 
-void Efficiency(double_t* Veff, TH1* THv, TH1* hist,int Nbin, double_t xmin, double_t xmax)
+//Fill list and histogram with efficiency values
+void Efficiency(double_t* Veff, TH1* THv, TH1* hist, int Nbin, double_t xmin, double_t xmax)
 {
     double_t full_integral = hist->Integral(), cut_integral;
-    double h = xmax/Nbin;
 
     for(int i=0;i<Nbin+1;i+=1)
     {
@@ -42,6 +61,7 @@ void Efficiency(double_t* Veff, TH1* THv, TH1* hist,int Nbin, double_t xmin, dou
     }
 }
 
+//Fill list and histogram with rejection values
 void Rejection(double_t* Vrej, TH1* THv, TH1* hist, int Nbin, double_t xmin, double_t xmax)
 {
     double_t cut_integral;
@@ -55,6 +75,7 @@ void Rejection(double_t* Vrej, TH1* THv, TH1* hist, int Nbin, double_t xmin, dou
     }
 }
 
+//Fill list and histogram with purity values
 void Purity(double_t* Vpur, TH1* THv, TH1* histbkg, TH1* histE, int Nbin, double_t xmin, double_t xmax)
 {
     double_t sum_integral, cut_integral;
@@ -76,6 +97,7 @@ void Purity(double_t* Vpur, TH1* THv, TH1* histbkg, TH1* histE, int Nbin, double
     }
 }
 
+//Return the maximum significance value or the cut value corresponding to this maximum and fill a histogram (TH1sign) with all the significance values
 double_t SignificanceTH(TH1* TH1sign, TH1* histEff, TH1* histRej, int Nbin, int Nbkg, int f, double_t xmin, double_t xmax, bool cut)
 {
     double_t Vsignificance[Nbin];
@@ -112,8 +134,10 @@ double_t SignificanceTH(TH1* TH1sign, TH1* histEff, TH1* histRej, int Nbin, int 
     return value;
 }
 
+
 TH1D *TH1sign = new TH1D("TH1sign","purity",100,0.0,7.0);
 
+//Return the maximum significance value or the cut value corresponding to this maximum
 double_t Significance(TH1* histEff, TH1* histRej, int Nbin, int Nbkg, int f, double_t xmin, double_t xmax, bool cut)
 {
     TH1sign->BufferEmpty();
@@ -151,127 +175,3 @@ double_t Significance(TH1* histEff, TH1* histRej, int Nbin, int Nbkg, int f, dou
     return value;
 }
 
-struct Particle{
-   	double_t E;
-    double_t P;
-    double_t Px;
-    double_t Py;
-    double_t Pz;
-    double_t Costheta;
-    double_t Phi;
-};
-
-struct Dalitz{
-    double_t m12;
-    double_t m23;
-};
-
-void GraphEffSignal(int N)
-{
-    double_t Veff1[N],Vpur1[N],Vrej1[N];
-    double_t Veff2[N],Vpur2[N],Vrej2[N];
-    double_t Veff3[N],Vpur3[N],Vrej3[N];
-    double_t Veff4[N],Vpur4[N],Vrej4[N];
-    double_t Veff5[N],Vpur5[N],Vrej5[N];
-
-    ifstream Vect("SignalBkgProp.txt");
-    for (int i=0;i<N;i++)
-    {
-        Vect >> Veff1[i] >> Vpur1[i] >> Vrej1[i];
-    }
-    for (int i=0;i<N;i++)
-    {
-        Vect >> Veff2[i] >> Vpur2[i] >> Vrej2[i];
-    }
-    for (int i=0;i<N;i++)
-    {
-        Vect >> Veff3[i] >> Vpur3[i] >> Vrej3[i];
-    }
-    for (int i=0;i<N;i++)
-    {
-        Vect >> Veff4[i] >> Vpur4[i] >> Vrej4[i];
-    }
-    for (int i=0;i<N;i++)
-    {
-        Vect >> Veff5[i] >> Vpur5[i] >> Vrej5[i];
-    }
-
-    TGraph *GraphPurEff1 = new TGraph (N,Veff1,Vpur1);
-    GraphPurEff1->SetTitle("Purity / Efficiency");
-    GraphPurEff1->GetHistogram()->GetXaxis()->SetTitle("Efficiency");
-    GraphPurEff1->GetHistogram()->GetYaxis()->SetTitle("Purity");
-    GraphPurEff1->GetHistogram()->SetMaximum(1.);
-    GraphPurEff1->SetLineColor(2);
-    GraphPurEff1->SetMarkerStyle(2);
-    GraphPurEff1->SetMarkerColor(2);
-    TGraph *GraphRejEff1 = new TGraph (N,Veff1,Vrej1);
-    GraphRejEff1->SetTitle("Rejection / Efficiency");
-    GraphRejEff1->GetHistogram()->GetXaxis()->SetTitle("Efficiency");
-    GraphRejEff1->GetHistogram()->GetYaxis()->SetTitle("Rejection");
-    GraphRejEff1->GetHistogram()->GetYaxis()->SetTitleOffset(1.2);
-    GraphRejEff1->SetLineColor(2);
-    GraphRejEff1->SetMarkerStyle(2);
-    GraphRejEff1->SetMarkerColor(2);
-
-    TGraph *GraphPurEff2 = new TGraph (N,Veff2,Vpur2);
-    GraphPurEff2->SetLineColor(4);
-    GraphPurEff2->SetMarkerStyle(2);
-    GraphPurEff2->SetMarkerColor(4);
-    TGraph *GraphRejEff2 = new TGraph (N,Veff2,Vrej2);
-    GraphRejEff2->SetLineColor(4);
-    GraphRejEff2->SetMarkerStyle(2);
-    GraphRejEff2->SetMarkerColor(4);
-    TGraph *GraphPurEff3 = new TGraph (N,Veff3,Vpur3);
-    GraphPurEff3->SetLineColor(8);
-    GraphPurEff3->SetMarkerStyle(2);
-    GraphPurEff3->SetMarkerColor(8);
-    TGraph *GraphRejEff3 = new TGraph (N,Veff3,Vrej3);
-    GraphRejEff3->SetLineColor(8);
-    GraphRejEff3->SetMarkerStyle(2);
-    GraphRejEff3->SetMarkerColor(8);
-    TGraph *GraphPurEff4 = new TGraph (N,Veff4,Vpur4);
-    GraphPurEff4->SetLineColor(1);
-    GraphPurEff4->SetMarkerStyle(2);
-    GraphPurEff4->SetMarkerColor(1);
-    TGraph *GraphRejEff4 = new TGraph (N,Veff4,Vrej4);
-    GraphRejEff4->SetLineColor(1);
-    GraphRejEff4->SetMarkerStyle(2);
-    GraphRejEff4->SetMarkerColor(1);
-    TGraph *GraphPurEff5 = new TGraph (N,Veff5,Vpur5);
-    GraphPurEff5->SetLineColor(28);
-    GraphPurEff5->SetMarkerStyle(2);
-    GraphPurEff5->SetMarkerColor(28);
-    TGraph *GraphRejEff5 = new TGraph (N,Veff5,Vrej5);
-    GraphRejEff5->SetLineColor(28);
-    GraphRejEff5->SetMarkerStyle(2);
-    GraphRejEff5->SetMarkerColor(28);
-
-    TCanvas* c = new TCanvas("comparisonSignalBkg","comparison SignalBkg",900,450) ;
-	c->Divide(2,1);
-	c->cd(1);
-	gPad->SetLeftMargin(0.15) ;  
-	GraphPurEff1->Draw("APL") ;
-    GraphPurEff2->Draw("same,PL") ;
-    GraphPurEff3->Draw("same,PL") ;
-    GraphPurEff4->Draw("same,PL") ;
-    //GraphPurEff5->Draw("same,PL") ;
-    gPad->SetLogy();
-    c->cd(2);
-	gPad->SetLeftMargin(0.15) ;  
-	GraphRejEff1->Draw("APL") ;
-    GraphRejEff2->Draw("same,PL") ;
-    GraphRejEff3->Draw("same,PL") ;
-    GraphRejEff4->Draw("same,PL") ;
-    //GraphRejEff5->Draw("same,PL") ;
-    TLegend *leg = new TLegend( .58, .65, .9, .9, "#Signal/#Bkg");
-    leg->SetTextSize(0.04);
-    leg->SetFillColor(0);
-    leg->SetFillStyle(1001);
-    leg->AddEntry( GraphPurEff1, "1", "lp");
-    leg->AddEntry( GraphPurEff2, "10", "lp");
-    leg->AddEntry( GraphPurEff3, "100", "lp");
-    leg->AddEntry( GraphPurEff4, "1000", "lp");
-    //leg->AddEntry( GraphPurEff5, "100000", "lp");
-    leg->Draw();
-    Vect.close();
-}

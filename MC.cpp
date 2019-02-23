@@ -1,9 +1,9 @@
 #include <iostream>
 #include <TRandom3.h>
-#include <time.h>
 #include "fct.cpp"
 using namespace std;
 
+//m12 distribution (function g(mnunu) in the article)
 RooAbsPdf * m12distrib(RooRealVar& m12)
 {
     RooGenericPdf * m12fct = new RooGenericPdf("m12_fct","m12*sqrt((pow(5.27962,2)-pow(m12+0.89581,2))*(pow(5.27962,2)-pow(m12-0.89581,2)))",m12);
@@ -13,14 +13,7 @@ RooAbsPdf * m12distrib(RooRealVar& m12)
 
 void MC()
 {
-    //timing
-    clock_t time1,time2;
-    time1=clock();
-
-    //style lhcb
-    gROOT->ProcessLine(".L lhcbStyle.C");
-
-    //Set seed
+    //Set seed for the random variables
     TRandom *random = new TRandom3();
     random->SetSeed(0);
 
@@ -36,8 +29,10 @@ void MC()
     Particle NuNu;
     Dalitz dalitz;
 
+    //Number of event in the background and in our simulation
     int nbkg = 722287;
-    int nbevts = 1000000;
+    int nbevts = 100000;
+
 
     //Define the tree, each branch is a particle
     TFile *ftree = new TFile("MC.root","recreate");
@@ -48,27 +43,32 @@ void MC()
     tree->Branch("Nu1event", &Nu1, "E/D:P/D:Px/D:Py/D:Pz/D:Costheta/D:Phi/D");
     tree->Branch("Nu2event", &Nu2, "E/D:P/D:Px/D:Py/D:Pz/D:Costheta/D:Phi/D");
     tree->Branch("NuNuevent", &NuNu, "E/D:P/D:Px/D:Py/D:Pz/D:Costheta/D:Phi/D");
+    //This branch is used to draw the Dalitz plot of the B->Knunu decay
     tree->Branch("Dalitz", &dalitz, "m12_2/D:m23_2/D");
+
 
     //All the constant in our simulation
     RooRealVar Ep("Ep","Positron energy (GeV)",4.0);
     RooRealVar Ee("Ee","Electron energy (GeV)",7.0);
     RooRealVar angle("angle","Angle between e+e- beam (rad)",0.083);
-    //RooRealVar mb("mb","mass b+/b-",5.27931);
-    //RooRealVar mk("mk","mass k*+/-",0.89166);
-    RooRealVar mb("mb","mass b0",5.27962);
-    RooRealVar mk("mk","mass k*0",0.89581);
+    //RooRealVar mb("mb","mass b+/b-(GeV)",5.27931);
+    //RooRealVar mk("mk","mass k*+/-(GeV)",0.89166);
+    RooRealVar mb("mb","mass B0 (GeV)",5.27962);
+    RooRealVar mk("mk","mass k*0 (GeV)",0.89581);
 
-    //Define the 4-vectors for e-/e+ & Upsilon 4S
+
+    //Define the 4-vectors Qe/Qp for e-/e+ & Qu for Upsilon 4S
     TLorentzVector Qp(-Ep.getVal(),0,0,Ep.getVal());
     TLorentzVector Qe(Ee.getVal()*cos(angle.getVal()),-Ee.getVal()*sin(angle.getVal()),0,Ee.getVal());
     TLorentzVector Qu = Qp + Qe;
 
-    //Calculate q and the impulsion of the B mesons
+
+    //Calculate q = sqrt(s) and pb the impulsion of the B mesons
     double_t q = sqrt(Qu*Qu);
     double_t pb = sqrt(q*q-4*mb.getVal()*mb.getVal())/2;
 
-    //Definition of all the random variables
+
+    //Definition of all the random variables used in the simulation
     RooRealVar costheta("costheta","angle between B-/B in the COM",0,-1,1);
     RooRealVar phi("phi","angle between B-/B in the COM",0,0,TMath::TwoPi());
 
@@ -78,26 +78,28 @@ void MC()
     RooRealVar costheta2("costheta2","angle between 2nu in the COM of B",0,-1,1);
     RooRealVar phi2("phi2","angle between 2nu in the COM of B",0,0,TMath::TwoPi());
 
-    RooRealVar m12("m12","mass 2nu system",0,0,4.38381);
+    RooRealVar m12("m12","mass 2nu system",0,0,4.38381);//Defined between 0 and mb-mk=4.38381
 
     //Calculate the boost for the B mesons
     TVector3 betaU = Boost(Qu);
 
-    //m12 distribution
+    //m12 distribution (g in the article)
     RooAbsPdf* m12distribution = m12distrib(m12);
+    //We need the Cumulative distribution function m12cdf because we use the Inverse transform method to randomly distribute m12 following m12distrib
     RooAbsReal * m12Cdf = m12distribution->createCdf(m12);
     TF1 * m12CdfTH1 = m12Cdf->asTF(m12);
 
-    //List for different resolution comparison
+    //Define list for different resolution on Emiss
     double_t* QnunuE10 = new double_t[nbevts];
     double_t* QnunuE20 = new double_t[nbevts];
     double_t* QnunuE30 = new double_t[nbevts];
     int k=0;
     double_t sigEmiss;
 
+
     for(int i=0;i<nbevts;i++)
     {
-        //Get values for all the random variable
+        ////Get values for all the random variable
         costheta.setVal(random->Uniform(costheta.getMin(),costheta.getMax()));
         phi.setVal(random->Uniform(phi.getMin(),phi.getMax()));
 
@@ -107,42 +109,55 @@ void MC()
         costheta2.setVal(random->Uniform(costheta2.getMin(),costheta2.getMax()));
         phi2.setVal(random->Uniform(phi2.getMin(),phi2.getMax()));
         
+        //For m12 we use the Inverse transform method
         double_t u = random->Uniform(0,1);
         
-        //Calculate the 4-vector for B & B_
+
+        ////Calculate the 4-vector for B & Bbar
         TLorentzVector Qb1 = TransfoLorentz(betaU,costheta,phi,pb,q/2);
         TLorentzVector Qb2 = TransfoLorentz(betaU,costheta,phi,-pb,q/2);
 
-        //Calculate the 4-vector for K & 2nu
+
+        ////Calculate the 4-vector for K (Qk) & 2nu system (Qnunu)
+        //Boost of the B
         TVector3 betaB1 = Boost(Qb1);
 
+        //Get the value for m12
         m12.setVal(m12CdfTH1->GetX(u));
 
+        //Calculate the impultion and energy of K
         double_t pK = sqrt((pow(mb.getVal(),2)-pow(m12.getVal()+mk.getVal(),2))*(pow(mb.getVal(),2)-pow(m12.getVal()-mk.getVal(),2)))/(2*mb.getVal());
         double_t EK = sqrt(mk.getVal()*mk.getVal()+pK*pK);
         
+        ////Calculate the impultion and energy of 2nu system
         double_t pnunu = -pK;
         double_t Enunu = mb.getVal()-EK;
 
         TLorentzVector Qk = TransfoLorentz(betaB1, costheta1, phi1, pK, EK);
         TLorentzVector Qnunu = TransfoLorentz(betaB1, costheta1, phi1, pnunu, Enunu);
 
-        //Resolution study
+
+        ////Resolution study on Emiss
+        //10% resolution
         sigEmiss = random->Gaus(0,Qnunu.E()*0.1);
         QnunuE10[k]=Qnunu.E()+sigEmiss;
+        //20% resolution
         sigEmiss = random->Gaus(0,Qnunu.E()*0.2);
         QnunuE20[k]=Qnunu.E()+sigEmiss;
+        //30% resolution
         sigEmiss = random->Gaus(0,Qnunu.E()*0.3);
         QnunuE30[k]=Qnunu.E()+sigEmiss;
         k+=1;
 
-        //Calculate the 4-vector for nu1 & nu2
+
+        //Calculate the 4-vector for nu1 & nu2 (not used)
         TVector3 betanunu = Boost(Qnunu);
 
         double_t qnunu = sqrt(Qnunu*Qnunu);
 
         TLorentzVector Qnu1 = TransfoLorentz(betanunu, costheta2, phi2, qnunu/2, qnunu/2);
         TLorentzVector Qnu2 = TransfoLorentz(betanunu, costheta2, phi2, -qnunu/2, qnunu/2);
+
 
         //Building the tree
         B1.E=Qb1.E();   file >> B1.E;
@@ -200,11 +215,12 @@ void MC()
         
     }
 
-    //Purity/Efficiency/Rejection study
+    ////Purity/Efficiency/Rejection study
+
     int Nbin=100;
     double_t xmin=0.0,xmax=7.;
 
-    //Different resolution TH1
+    //TH1 for differents resolutions
     TH1D *missE10 = new TH1D("missE10","missE10",Nbin,xmin,xmax);
     TH1D *missE20 = new TH1D("missE20","missE20",Nbin,xmin,xmax);
     TH1D *missE30 = new TH1D("missE30","missE30",Nbin,xmin,xmax);
@@ -216,7 +232,7 @@ void MC()
         missE30->Fill(QnunuE30[i]);
     }
 
-    //TrueBkg_com to lab frame
+    //Get the total Energy background Bkg from the .root file
     TFile* f1 = new TFile("missingEnergy.root");
     TTree* t1 = (TTree*)f1->Get("tree");
 
@@ -224,7 +240,7 @@ void MC()
     t1->Draw("E>>Bkg","","goff");
 
 
-    //Draw efficiency histogram
+    //Draw efficiency histogram for differents resolutions
     TH1D *missE = new TH1D("missE","Missing energy",Nbin,xmin,xmax);
     tree->Draw("NuNuevent.E>>missE","","goff");
     
@@ -244,14 +260,14 @@ void MC()
     Efficiency(Vefficiency30,TH1efficiency30,missE30,Nbin,xmin,xmax);
     
 
-    //Draw rejection histogram
+    //Draw rejection histogram (doesn't change for differents resolutions)
     TH1D *TH1rejection = new TH1D("TH1rejection","rejection",Nbin,xmin,xmax);
 
     double_t Vrejection[Nbin+1];
     Rejection(Vrejection,TH1rejection,Bkg,Nbin,xmin,xmax);
 
 
-    //Add bkg with signal
+    //Add bkg with signal for differents resolutions
     TH1D *sumbkgsig = new TH1D("sumbkgsig","sumbkgsig",Nbin,xmin,xmax);
     TH1D *sumbkgsig10 = new TH1D("sumbkgsig10","sumbkgsig",Nbin,xmin,xmax);
     TH1D *sumbkgsig20 = new TH1D("sumbkgsig20","sumbkgsig",Nbin,xmin,xmax);
@@ -261,7 +277,8 @@ void MC()
     sumbkgsig20->Add(Bkg,missE20);
     sumbkgsig30->Add(Bkg,missE30);
 	
-    //Draw purity histogram
+
+    //Draw purity histogram for differents resolutions
     TH1D *TH1purity = new TH1D("TH1purity","purity",Nbin,xmin,xmax);
     TH1D *TH1purity10 = new TH1D("TH1purity10","purity",Nbin,xmin,xmax);
     TH1D *TH1purity20 = new TH1D("TH1purity20","purity",Nbin,xmin,xmax);
@@ -278,7 +295,7 @@ void MC()
     Purity(Vpurity30,TH1purity30,sumbkgsig30,missE30,Nbin,xmin,xmax);
 
 
-    //Significance study
+    ////Significance study
     TH1D *TH1significance1 = new TH1D("TH1significance1","purity",Nbin,xmin,xmax);
     TH1D *TH1significance2 = new TH1D("TH1significance2","purity",Nbin,xmin,xmax);
     TH1D *TH1significance3 = new TH1D("TH1significance3","purity",Nbin,xmin,xmax);
@@ -304,13 +321,15 @@ void MC()
     double_t S30f1000 = Significance(TH1efficiency30,TH1rejection,Nbin,nbkg,1000,xmin,xmax,false);
     double_t S30f100000 = Significance(TH1efficiency30,TH1rejection,Nbin,nbkg,100000,xmin,xmax,false);
 
+    cout<<"____________________"<<endl;
+    cout<<"Significance and cut values for different background to signal fraction and Resolution on Emiss"<<endl;
     cout<<endl;
     cout<<"Significance values"<<endl;
     cout<<"Fraction:        "<<"1"<<"\t"<<"10"<<"\t"<<"100"<<"\t"<<"1000"<<"\t"<<"100000"<<endl;
     cout<<endl;
-    cout<<"EmissEff: 10\%  "<<setprecision(3)<<S10f1<<"\t"<<S10f10<<"\t"<<S10f100<<"\t"<<S10f1000<<"\t"<<S10f100000<<endl;
-    cout<<"EmissEff: 20\%  "<<setprecision(3)<<S20f1<<"\t"<<S20f10<<"\t"<<S20f100<<"\t"<<S20f1000<<"\t"<<S20f100000<<endl;
-    cout<<"EmissEff: 30\%  "<<setprecision(3)<<S30f1<<"\t"<<S30f10<<"\t"<<S30f100<<"\t"<<S30f1000<<"\t"<<S30f100000<<endl; 
+    cout<<"EmissRes: 10\%  "<<setprecision(3)<<S10f1<<"\t"<<S10f10<<"\t"<<S10f100<<"\t"<<S10f1000<<"\t"<<S10f100000<<endl;
+    cout<<"EmissRes: 20\%  "<<setprecision(3)<<S20f1<<"\t"<<S20f10<<"\t"<<S20f100<<"\t"<<S20f1000<<"\t"<<S20f100000<<endl;
+    cout<<"EmissRes: 30\%  "<<setprecision(3)<<S30f1<<"\t"<<S30f10<<"\t"<<S30f100<<"\t"<<S30f1000<<"\t"<<S30f100000<<endl; 
     cout<<endl;
 
     //table with cut
@@ -332,12 +351,62 @@ void MC()
     S30f1000 = Significance(TH1efficiency30,TH1rejection,Nbin,nbkg,1000,xmin,xmax,true);
     S30f100000 = Significance(TH1efficiency30,TH1rejection,Nbin,nbkg,100000,xmin,xmax,true);
 
+    cout<<endl;
     cout<<"Cut values"<<endl;
     cout<<"Fraction:        "<<"1"<<"\t"<<"10"<<"\t"<<"100"<<"\t"<<"1000"<<"\t"<<"100000"<<endl;
     cout<<endl;
-    cout<<"EmissEff: 10\%  "<<setprecision(3)<<S10f1<<"\t"<<S10f10<<"\t"<<S10f100<<"\t"<<S10f1000<<"\t"<<S10f100000<<endl;
-    cout<<"EmissEff: 20\%  "<<setprecision(3)<<S20f1<<"\t"<<S20f10<<"\t"<<S20f100<<"\t"<<S20f1000<<"\t"<<S20f100000<<endl;
-    cout<<"EmissEff: 30\%  "<<setprecision(3)<<S30f1<<"\t"<<S30f10<<"\t"<<S30f100<<"\t"<<S30f1000<<"\t"<<S30f100000<<endl; 
+    cout<<"EmissRes: 10\%  "<<setprecision(3)<<S10f1<<"\t"<<S10f10<<"\t"<<S10f100<<"\t"<<S10f1000<<"\t"<<S10f100000<<endl;
+    cout<<"EmissRes: 20\%  "<<setprecision(3)<<S20f1<<"\t"<<S20f10<<"\t"<<S20f100<<"\t"<<S20f1000<<"\t"<<S20f100000<<endl;
+    cout<<"EmissRes: 30\%  "<<setprecision(3)<<S30f1<<"\t"<<S30f10<<"\t"<<S30f100<<"\t"<<S30f1000<<"\t"<<S30f100000<<endl; 
+    cout<<endl;
+
+
+    ////#bkg to #signal fraction needed to get 3 and 5sigma
+    cout<<"____________________"<<endl;
+    cout<<"Background to signal fraction and significance study"<<endl;
+	cout<<endl;
+	cout<<"10\% EmissRes"<<endl;
+    double_t S;
+	for(int i=100;i<1000;i++)
+	{
+		S = Significance(TH1efficiency10,TH1rejection,Nbin,nbkg,i,xmin,xmax,false);
+        if((S<=3.01) && (S>=2.99))
+		{
+			cout<<"Fraction = "<<i<<" : "<<"Significance = "<<S<<endl;
+		}
+		if((S<=5.02) && (S>=4.99))
+		{
+			cout<<"Fraction = "<<i<<" : "<<"Significance = "<<S<<endl;
+		}
+	}
+	cout<<endl;
+	cout<<"20\% EmissRes"<<endl;
+	for(int i=100;i<1000;i++)
+	{
+		S = Significance(TH1efficiency20,TH1rejection,Nbin,nbkg,i,xmin,xmax,false);
+		if((S<=3.01) && (S>=2.99))
+		{
+			cout<<"Fraction = "<<i<<" : "<<"Significance = "<<S<<endl;
+		}
+		if((S<=5.02) && (S>=4.99))
+		{
+			cout<<"Fraction = "<<i<<" : "<<"Significance = "<<S<<endl;
+		}
+	}
+	cout<<endl;
+	cout<<"30\% EmissRes"<<endl;
+	for(int i=100;i<1000;i++)
+	{
+		S = Significance(TH1efficiency30,TH1rejection,Nbin,nbkg,i,xmin,xmax,false);
+		if((S<=3.01) && (S>=2.99))
+		{
+			cout<<"Fraction = "<<i<<" : "<<"Significance = "<<S<<endl;
+		}
+		if((S<=5.02) && (S>=4.99))
+		{
+			cout<<"Fraction = "<<i<<" : "<<"Significance = "<<S<<endl;
+		}
+	}
     cout<<endl;
 
 
@@ -409,7 +478,7 @@ void MC()
     missE->GetXaxis()->SetTitle("Enunu [GeV]");
     missE->GetYaxis()->SetTitle("Events/0.07 GeV");
 
-    TH1significance1->SetTitle("Significance (10\%)");
+    TH1significance1->SetTitle("Significance (10\% EmissRes)");
     TH1significance1->GetXaxis()->SetTitle("Cut [GeV]");
     TH1significance1->GetYaxis()->SetTitle("Significance");
     TH1significance1->SetMarkerStyle(0);
@@ -479,7 +548,7 @@ void MC()
     TH1significance4->Draw("same") ;
     TH1significance5->Draw("same") ;
 
-
+    //Add legend
     TLegend *leg = new TLegend( .58, .65, .9, .9, "Emiss Resolution");
     leg->SetTextSize(0.04);
     leg->SetFillColor(0);
@@ -490,9 +559,6 @@ void MC()
     leg->AddEntry( GraphPurEff30, "30\%", "lp");
     c->cd(1);leg->Draw();
     d->cd(2);leg->Draw();
-    //d->cd(1);leg->Draw();
-    //d->cd(3);leg->Draw();
-    //d->cd(5);leg->Draw();
 
     TLegend *leg1 = new TLegend( .58, .65, .9, .9, "#Bkg/#Signal");
     leg1->SetTextSize(0.04);
@@ -505,27 +571,6 @@ void MC()
     leg1->AddEntry( TH1significance5, "100000", "lp");
     d->cd(6);leg1->Draw();
 
-    //Useful for different signal/bkg comparison
-    //ofstream fileSignal("SignalBkgProp.txt");
-    //ofstream fileSignal("SignalBkgProp.txt",std::ios_base::app); //without erasing
-    //for (int i=0;i<Nbin+1;i++)
-    //{
-    //    fileSignal<<Vefficiency[i]<<" "<<Vpurity[i]<<" "<<Vrejection[i]<<endl;
-    //}
-    //fileSignal.close();
-
-    GraphEffSignal(Nbin+1);
-
     tree->Fill();
     ftree->Write();
-
-    //Draw the Dalitz plot
-    //tree->Draw("m23_2:m12_2>>(250,0,25,300,0,30)","","colz");
-
-    //ftree->Close();
-    //f1->Close();
-    //file.Close();
-    time2=clock();
-  
-    int diff = ((float)time2-(float)time1)/CLOCKS_PER_SEC;int s,m,h;m=diff/60;s=diff%60;h=m/60;m=m%60;std::cout<<std::endl;std::cout<<"time : ";if (h>0){std::cout<<h<<"h ";}if (m>0){std::cout<<m<<"m ";}std::cout<<s<<"s"<<std::endl;std::cout<<std::endl; 
 }
